@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -12,15 +13,40 @@ def _utcnow() -> str:
 
 
 class AccountStore:
-    """账号存储，密码通过注入的加密器加密后再落盘。"""
+    """账号存储，密码通过注入的加密器加密后再落盘。
+
+    连接按线程惰性创建（thread-local）。原因：pywebview 的 js_api 方法运行在
+    子线程，而 SQLite 连接默认禁止跨线程使用（check_same_thread）。每个线程
+    独占一条连接最省心，也不用在业务代码里到处加锁。
+
+    所有创建出来的连接都被登记在 _conns 里，close() 时统一关闭——否则子线程
+    的连接会一直占着文件句柄（实测会导致测试的临时目录删不掉）。
+
+    connect 时传 check_same_thread=False 是必需的：close() 通常在主线程执行，
+    而那条连接是在子线程创建的，默认设置下连 close() 都会抛 ProgrammingError。
+    因为连接本身是 thread-local 的，每个线程仍独占自己那条，不存在并发共用。
+    """
 
     def __init__(self, db_path: str | Path, encryptor) -> None:
         self._encryptor = encryptor
         self._db_path = Path(db_path)
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(str(self._db_path))
-        self._conn.row_factory = sqlite3.Row
+        self._local = threading.local()
+        self._conns: list[sqlite3.Connection] = []
+        self._conns_lock = threading.Lock()
         self._init_schema()
+
+    @property
+    def _conn(self) -> sqlite3.Connection:
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            self._local.conn = conn
+            with self._conns_lock:
+                self._conns.append(conn)
+        return conn
+
 
     def _init_schema(self) -> None:
         self._conn.executescript(
@@ -162,4 +188,13 @@ class AccountStore:
         self._conn.commit()
 
     def close(self) -> None:
-        self._conn.close()
+        """关闭所有线程创建过的连接（用于程序退出与测试清理）。"""
+        with self._conns_lock:
+            conns, self._conns = list(self._conns), []
+        for conn in conns:
+            try:
+                conn.close()
+            except Exception:  # noqa: BLE001
+                pass
+        if getattr(self._local, "conn", None) is not None:
+            self._local.conn = None

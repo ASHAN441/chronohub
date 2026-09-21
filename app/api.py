@@ -4,6 +4,8 @@ import sys
 import threading
 from tkinter import filedialog
 
+from .account_service import AccountService
+from .clipboard import set_text_temporary
 from .config import app_info
 from .parser import PARSER_VERSION, parse_pdf
 from .people_store import (
@@ -15,12 +17,18 @@ from .people_store import (
     save_groups,
     save_people,
 )
+from .system_urls import DEFAULT_LOGIN_URL, SYSTEM_URLS
 
 
 class Api:
     """暴露给前端 JS 的接口（pywebview 桥）。"""
 
-    def __init__(self, data_path: str = None, groups_path: str = None):
+    def __init__(
+        self,
+        data_path: str = None,
+        groups_path: str = None,
+        accounts_db_path: str = None,
+    ):
         self._window = None
         self._qt_app = None
         self.data_path = data_path or DATA_FILE
@@ -29,6 +37,8 @@ class Api:
         self.groups = load_groups(self.groups_path)
         self._lock = threading.Lock()
         self._import = self._idle_import_state()
+        # 账号模块（来自原「教务系统管理器」）；db 路径可注入，便于测试
+        self.accounts = AccountService(accounts_db_path)
 
     def attach_qt(self, qt_app) -> None:
         """由 app.main 在 GUI 启动后注入 Qt QApplication 实例。
@@ -432,6 +442,66 @@ class Api:
             return folder or ""
         finally:
             root.destroy()
+
+    # ================= 账号管理（来自原「教务系统管理器」） =================
+
+    def _imported_ids(self) -> set:
+        """已导入课表的人员学号集合，用于判断某个账号的课表是否已入库。"""
+        return {p.student_id for p in self.people if p.student_id}
+
+    def _accounts_payload(self, result: dict = None) -> dict:
+        """账号接口统一返回结构：永远带上最新账号列表与当前账号 id。"""
+        payload = {
+            "accounts": self.accounts.list_accounts(self._imported_ids()),
+            "active_id": self.accounts.get_active_account_id(),
+        }
+        if result:
+            payload.update(result)
+        return payload
+
+    def get_accounts(self) -> dict:
+        return self._accounts_payload()
+
+    def add_account(self, nickname, username, password, notes="") -> dict:
+        return self._accounts_payload(
+            self.accounts.add(nickname, username, password, notes)
+        )
+
+    def update_account(
+        self, account_id, nickname="", username="", password="", notes=""
+    ) -> dict:
+        return self._accounts_payload(
+            self.accounts.update(account_id, nickname, username, password, notes)
+        )
+
+    def delete_account(self, account_id) -> dict:
+        return self._accounts_payload(self.accounts.remove(account_id))
+
+    def set_active_account(self, account_id) -> dict:
+        return self._accounts_payload(self.accounts.set_active(account_id))
+
+    def copy_account_password(self, account_id, auto_clear_seconds=30) -> dict:
+        """取出明文密码写入剪贴板（前端不展示、不持久化），30 秒后自动清空。"""
+        result = self.accounts.get_password(account_id)
+        if not result.get("ok"):
+            return result
+        seconds = int(auto_clear_seconds or 30)
+        if not set_text_temporary(result["password"], seconds):
+            return {"ok": False, "error": "写入剪贴板失败"}
+        return {"ok": True, "cleared_in": seconds}
+
+    def get_system_urls(self) -> dict:
+        return {
+            "urls": [{"label": label, "url": url} for label, url in SYSTEM_URLS],
+            "current": self.accounts.get_login_url(DEFAULT_LOGIN_URL),
+        }
+
+    def set_login_url(self, url: str) -> dict:
+        self.accounts.set_login_url(url or "")
+        return {
+            "ok": True,
+            "current": self.accounts.get_login_url(DEFAULT_LOGIN_URL),
+        }
 
     def minimize(self) -> None:
         if self._window is not None:

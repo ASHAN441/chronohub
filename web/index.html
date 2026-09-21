@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>多人空课表</title>
+  <title>SYNUTV</title>
   <style>
     :root{ color-scheme: light dark; }
     html, body{ margin:0; height:100%; }
@@ -181,13 +181,84 @@
     .person-item.out-of-scope{ opacity:.5; }
     .group-empty{ font-size:11px; color:var(--win-text-muted); padding:4px 10px 8px; }
     .person-item.dragging{ opacity:.45; }
+
+    /* ================= 合并后新增：左侧导航栏 ================= */
+    .shell{ display:flex; flex:1; min-height:0; }
+    .rail{ width:76px; flex:none; background:var(--win-surface); border-right:1px solid var(--win-border); padding:8px 6px; display:flex; flex-direction:column; gap:4px; }
+    .rail-item{ display:flex; flex-direction:column; align-items:center; gap:4px; padding:9px 2px 7px; border:none; background:transparent; color:var(--win-text); font-family:inherit; font-size:11px; border-radius:6px; cursor:pointer; position:relative; }
+    .rail-item svg{ width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+    .rail-item:hover{ background:var(--win-surface-3); }
+    .rail-item.active{ background:var(--win-accent-soft); color:var(--win-accent); font-weight:600; }
+    .rail-item.active::before{ content:""; position:absolute; left:-6px; top:50%; transform:translateY(-50%); width:3px; height:20px; border-radius:0 2px 2px 0; background:var(--win-accent); }
+    .rail-badge{ position:absolute; top:4px; right:12px; min-width:16px; height:16px; padding:0 4px; border-radius:8px; background:var(--win-accent); color:var(--win-accent-fg); font-size:10px; font-weight:600; line-height:16px; text-align:center; }
+    .rail-spacer{ flex:1; }
+    .view-wrap{ flex:1; min-width:0; display:flex; flex-direction:column; }
+    .view{ flex:1; min-height:0; display:none; flex-direction:column; }
+    .view.active{ display:flex; }
+
+    /* ================= 合并后新增：账号管理页 ================= */
+    .acct-body{ flex:1; min-height:0; display:flex; }
+    .acct-list-wrap{ flex:1; min-width:0; overflow:auto; padding:12px; }
+    .acct-card{ display:flex; align-items:center; gap:12px; padding:11px 13px; border:1px solid var(--win-border); border-radius:8px; background:var(--win-surface); margin-bottom:8px; cursor:pointer; }
+    .acct-card:hover{ border-color:color-mix(in srgb, var(--win-accent) 45%, var(--win-border)); background:var(--win-surface-2); }
+    .acct-card.sel{ border-color:var(--win-accent); background:var(--win-accent-soft); }
+    .acct-avatar{ width:36px; height:36px; border-radius:50%; background:var(--win-accent-soft); color:var(--win-accent); display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:600; flex:none; }
+    .acct-main{ flex:1; min-width:0; }
+    .acct-name{ font-size:14px; font-weight:600; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .acct-star{ color:var(--win-free); font-size:12px; }
+    .acct-sub{ font-size:12px; color:var(--win-text-muted); margin-top:2px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .acct-notes{ font-size:11px; color:var(--win-text-muted); background:var(--win-surface-3); padding:0 6px; border-radius:4px; }
+    .acct-acts{ display:flex; gap:6px; flex:none; }
+    .chip{ font-size:11px; padding:1px 8px; border-radius:999px; border:1px solid transparent; white-space:nowrap; }
+    .chip.ok{ color:var(--win-free); background:color-mix(in srgb, var(--win-free) 13%, var(--win-surface)); border-color:color-mix(in srgb, var(--win-free) 38%, var(--win-border)); }
+    .chip.no{ color:var(--win-text-muted); background:var(--win-surface-3); border-color:var(--win-border); }
+    .icon-btn{ height:26px; padding:0 9px; font-size:12px; font-family:inherit; border:1px solid var(--win-border); border-radius:5px; background:var(--win-surface-2); color:var(--win-text); cursor:pointer; }
+    .icon-btn:hover{ background:var(--win-surface-3); }
+    .icon-btn.danger:hover{ color:#c42b1c; border-color:color-mix(in srgb, #c42b1c 45%, var(--win-border)); background:color-mix(in srgb, #c42b1c 10%, var(--win-surface)); }
+    .acct-side{ width:272px; flex:none; border-left:1px solid var(--win-border); background:var(--win-surface); padding:14px; overflow:auto; }
+    .side-title{ font-size:12px; font-weight:600; margin-bottom:8px; }
+    .side-kv{ display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:5px 0; border-bottom:1px dashed var(--win-border); }
+    .side-kv span:first-child{ color:var(--win-text-muted); }
+    .side-kv span:last-child{ text-align:right; word-break:break-all; }
+    .flow-card{ margin-top:14px; border:1px solid var(--win-border); border-radius:8px; padding:11px; background:var(--win-surface-2); }
+    .flow-title{ font-size:12px; font-weight:600; margin-bottom:7px; }
+    .flow-step{ display:flex; gap:8px; font-size:12px; color:var(--win-text-muted); padding:3px 0; align-items:flex-start; }
+    .flow-num{ width:16px; height:16px; flex:none; border-radius:50%; background:var(--win-accent-soft); color:var(--win-accent); font-size:10px; line-height:16px; text-align:center; font-weight:600; }
+    .acct-empty{ padding:40px 20px; text-align:center; color:var(--win-text-muted); }
+    .acct-empty .t{ font-size:15px; color:var(--win-text); font-weight:500; margin-bottom:6px; }
+    .form-row{ margin-bottom:10px; }
+    .form-row label{ display:block; font-size:12px; color:var(--win-text-muted); margin-bottom:5px; }
+    .form-row .win-input{ width:100%; }
+
+    /* ================= 合并后新增：课表导出页 ================= */
+    .browser-body{ flex:1; min-height:0; display:flex; flex-direction:column; padding:12px; gap:10px; }
+    .mock-win{ flex:1; min-height:0; display:flex; flex-direction:column; border:1px solid var(--win-border); border-radius:8px; overflow:hidden; background:var(--win-surface); }
+    .browser-placeholder{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; text-align:center; padding:24px; }
+    .browser-placeholder .ph-title{ font-size:15px; font-weight:500; }
+    .browser-placeholder .ph-sub{ font-size:12.5px; color:var(--win-text-muted); max-width:520px; line-height:1.7; }
+    .import-card{ flex:none; border:1px solid var(--win-border); border-radius:8px; background:var(--win-surface); padding:11px 13px; display:flex; align-items:center; gap:12px; }
+    .import-card .ic-title{ font-size:13px; font-weight:600; }
+    .import-card .ic-sub{ font-size:12px; color:var(--win-text-muted); margin-top:2px; line-height:1.6; }
+    .import-card .ic-arrow{ font-size:16px; color:var(--win-text-muted); flex:none; }
+
+    /* ================= 合并后新增：关于页 ================= */
+    .about-view{ flex:1; display:flex; align-items:center; justify-content:center; padding:24px; overflow:auto; }
+    .about-box{ text-align:center; max-width:560px; }
+    .about-big-logo{ width:64px; height:64px; border-radius:16px; background:var(--win-accent); color:var(--win-accent-fg); display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:600; margin:0 auto 14px; }
+    .about-big-name{ font-size:20px; font-weight:600; }
+    .about-big-version{ font-size:13px; color:var(--win-text-muted); margin-top:4px; }
+    .about-note{ font-size:12.5px; color:var(--win-text-muted); margin-top:16px; line-height:1.8; }
+    .about-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:18px; text-align:left; }
+    .about-cell{ border:1px solid var(--win-border); border-radius:8px; padding:10px 12px; background:var(--win-surface); }
+    .about-cell b{ display:block; font-size:12px; margin-bottom:3px; }
+    .about-cell span{ font-size:12px; color:var(--win-text-muted); line-height:1.6; }
   </style>
 </head>
 <body>
   <div class="win-titlebar">
     <div class="win-titlebar-left">
-      <span class="win-logo">空</span>
-      <span class="win-title">多人空课表</span>
+      <span class="win-logo">S</span>
+      <span class="win-title">SYNUTV</span>
       <span class="win-version" id="app-version"></span>
     </div>
     <div class="win-controls">
@@ -197,10 +268,36 @@
     </div>
   </div>
 
+  <div class="shell">
+    <nav class="rail">
+      <button class="rail-item active" data-view="freetime" type="button">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.2"/><path d="M3 9.5h18M9 9.5V20.5M15 9.5V20.5"/></svg>
+        空课表
+        <span class="rail-badge" id="rail-people-badge">0</span>
+      </button>
+      <button class="rail-item" data-view="accounts" type="button">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-3.6 3.4-6.2 7.5-6.2s7.5 2.6 7.5 6.2"/></svg>
+        账号
+        <span class="rail-badge" id="rail-acct-badge">0</span>
+      </button>
+      <button class="rail-item" data-view="browser" type="button">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2.2"/><path d="M3 9h18"/><path d="M7 6.7h.01M9.6 6.7h.01"/></svg>
+        课表导出
+      </button>
+      <span class="rail-spacer"></span>
+      <button class="rail-item" data-view="about" type="button">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.2M12 8.1h.01"/></svg>
+        关于
+      </button>
+    </nav>
+
+    <div class="view-wrap">
+      <!-- 说明：下面这个「空课表」视图是从原 空课表/web/index.html 原样搬运的，
+           为保持 diff 可读，内容未做缩进调整。 -->
+      <section class="view active" id="view-freetime">
   <div class="win-toolbar">
     <button class="tb-btn primary" id="import-btn" type="button">导入课表</button>
     <button class="tb-btn" id="export-btn" type="button">导出</button>
-    <button class="tb-btn" id="about-btn" type="button">关于</button>
     <span class="tb-sep"></span>
     <label class="tb-field">学期
       <select class="tb-select" id="semester-select"></select>
@@ -252,6 +349,112 @@
         <span class="win-legend-note">颜色越深，空闲人数越多</span>
       </div>
     </main>
+  </div>
+      </section>
+
+      <!-- ============ 账号管理（来自原「教务系统管理器」） ============ -->
+      <section class="view" id="view-accounts">
+        <div class="win-toolbar">
+          <button class="tb-btn primary" id="acct-add" type="button">＋ 新增账号</button>
+          <button class="tb-btn" id="acct-import" type="button">导入 CSV</button>
+          <button class="tb-btn" id="acct-export" type="button">导出 CSV</button>
+          <span class="tb-sep"></span>
+          <input class="win-input" id="acct-search" placeholder="搜索昵称 / 学号 / 备注" style="width:230px;height:30px;">
+          <span class="tb-spacer"></span>
+          <span class="tb-info" id="acct-count"></span>
+        </div>
+        <div class="acct-body">
+          <div class="acct-list-wrap" id="acct-list"></div>
+          <aside class="acct-side">
+            <div class="side-title">账号详情</div>
+            <div id="acct-detail"></div>
+            <div class="flow-card">
+              <div class="flow-title">合并后的完整流程</div>
+              <div class="flow-step"><span class="flow-num">1</span><span>存好教务系统账号，密码用 Windows DPAPI 加密</span></div>
+              <div class="flow-step"><span class="flow-num">2</span><span>到「课表导出」一键登录并导出课表 PDF</span></div>
+              <div class="flow-step"><span class="flow-num">3</span><span>PDF <b>自动解析入库</b>，不用再手动选文件</span></div>
+              <div class="flow-step"><span class="flow-num">4</span><span>回「空课表」勾选人员，看共同空闲时间</span></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ============ 课表导出（内嵌浏览器） ============ -->
+      <section class="view" id="view-browser">
+        <div class="win-toolbar">
+          <label class="tb-field">账号
+            <select class="tb-select" id="browser-account"></select>
+          </label>
+          <label class="tb-field">系统地址
+            <select class="tb-select" id="browser-url"></select>
+          </label>
+          <button class="tb-btn primary" id="browser-login" type="button">打开并登录</button>
+          <span class="tb-sep"></span>
+          <button class="tb-btn" id="browser-logout" type="button">清除登录状态</button>
+          <span class="tb-spacer"></span>
+          <span class="tb-info" id="browser-hint">尚未登录</span>
+        </div>
+        <div class="browser-body">
+          <div class="mock-win">
+            <div class="browser-placeholder" id="browser-placeholder">
+              <div class="ph-title">内嵌浏览器待接入</div>
+              <div class="ph-sub" id="browser-placeholder-sub">
+                这块由 PySide6 的 QtWebEngine 承载，复用原「教务系统管理器」的自动登录注入与 PDF 下载接管逻辑。
+                当前骨架先把界面和账号链路打通，浏览器窗口在下一步接入。
+              </div>
+            </div>
+          </div>
+          <div class="import-card">
+            <span class="ic-arrow">↳</span>
+            <div>
+              <div class="ic-title">导出后自动入库</div>
+              <div class="ic-sub" id="import-card-sub">导出的课表 PDF 会直接解析并合并进「空课表」，不需要再手动选文件。</div>
+            </div>
+            <span class="tb-spacer"></span>
+            <button class="tb-btn" id="goto-freetime" type="button">去看空课表</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 关于 ============ -->
+      <section class="view" id="view-about">
+        <div class="about-view">
+          <div class="about-box">
+            <div class="about-big-logo">S</div>
+            <div class="about-big-name" id="about-big-name">SYNUTV</div>
+            <div class="about-big-version" id="about-big-version">v3.0</div>
+            <div class="about-note" id="about-note"></div>
+            <div class="about-grid">
+              <div class="about-cell"><b>账号与安全</b><span>账号存 SQLite，密码用 Windows DPAPI 加密，只有当前 Windows 用户能解密</span></div>
+              <div class="about-cell"><b>课表解析</b><span>支持网格版式与列表版式两种 PDF，自动展开单双周与周次区间</span></div>
+              <div class="about-cell"><b>本地优先</b><span>全部数据存在本地 data/ 目录，不上传任何服务器</span></div>
+              <div class="about-cell"><b>内嵌浏览器</b><span>Chromium 内核（QtWebEngine），自动登录与导出课表都在应用窗口内完成</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- 账号新增/编辑弹窗 -->
+  <div class="win-modal" id="acct-modal" hidden>
+    <div class="win-modal-backdrop" id="acct-modal-backdrop"></div>
+    <div class="win-modal-card">
+      <div class="win-modal-head">
+        <span id="acct-modal-title">新增账号</span>
+        <button class="win-modal-close" id="acct-modal-close" type="button" aria-label="关闭">✕</button>
+      </div>
+      <div class="win-modal-body" style="text-align:left;align-items:stretch">
+        <div class="form-row"><label>昵称</label><input class="win-input" id="acct-f-nick" placeholder="例如：张传山"></div>
+        <div class="form-row"><label>用户名（学号）</label><input class="win-input" id="acct-f-user" placeholder="例如：2023010101"></div>
+        <div class="form-row"><label>密码</label><input class="win-input" id="acct-f-pass" type="password" placeholder="保存时由 DPAPI 加密"></div>
+        <div class="form-row"><label>备注</label><input class="win-input" id="acct-f-notes" placeholder="可选，例如：记者部"></div>
+      </div>
+      <div class="win-modal-foot" style="display:flex;justify-content:flex-end;gap:8px;padding:0 14px 14px">
+        <button class="tb-btn" id="acct-modal-cancel" type="button">取消</button>
+        <button class="tb-btn primary" id="acct-save" type="button">保存</button>
+      </div>
+    </div>
   </div>
 
   <div class="win-statusbar">
@@ -474,7 +677,11 @@
         ]}
       ];
 
-      var DEFAULT_APP_INFO = { name:'多人空课表', version:'2.1', developer:'阿山', contact:'ashan441@163.com', copyright:'© 2026 阿山' };
+      var DEFAULT_APP_INFO = {
+        name:'SYNUTV', version:'3.0', developer:'阿山', contact:'ashan441@163.com',
+        copyright:'© 2026 阿山',
+        merged_from:'由「教务系统管理器 v1.0.0」与「多人空课表 v2.1」合并'
+      };
 
       var state = { people: [], groups: [], selected: new Set(), semester: 'all', group: 'all', week: 1, search: '', sort: 'default' };
 
@@ -705,6 +912,8 @@
       }
 
       function updateStatus(){
+        // 合并后：仅当「空课表」视图激活时才写状态栏，避免覆盖其他视图的提示
+        if(currentView() !== 'freetime') return;
         var sel = selectedList();
         if(sel.length===0){
           document.getElementById('status-summary').textContent = '请至少选择一人';
@@ -1313,6 +1522,7 @@
         renderPeople();
         updatePeopleCount();
         renderGrid();
+        afterDataChange();   // 合并后新增：同步导航角标与账号页的课表入库状态
       }
 
       function showToast(message){
@@ -1372,6 +1582,16 @@
         document.getElementById('about-dev').textContent = '开发者：' + info.developer;
         document.getElementById('about-contact').textContent = info.contact || '';
         document.getElementById('about-copyright').textContent = info.copyright || '';
+        // 合并后新增：整页版「关于」视图
+        var bigName = document.getElementById('about-big-name');
+        if(bigName) bigName.textContent = info.name;
+        var bigVer = document.getElementById('about-big-version');
+        if(bigVer) bigVer.textContent = 'v' + info.version + (info.merged_from ? ' · ' + info.merged_from : '');
+        var note = document.getElementById('about-note');
+        if(note){
+          note.innerHTML = '一个应用管完全程：账号管理 → 自动登录 → 导出课表 → 解析入库 → 多人空闲统计。<br>' +
+            '开发者：' + esc(info.developer || '') + ' · ' + esc(info.contact || '') + ' · ' + esc(info.copyright || '');
+        }
       }
 
       async function loadAppInfo(){
@@ -1722,7 +1942,6 @@
       document.getElementById('person-close').addEventListener('click', closePersonModal);
       document.getElementById('person-backdrop').addEventListener('click', closePersonModal);
       document.getElementById('export-btn').addEventListener('click', function(){ showToast('导出功能开发中，下一版本提供。'); });
-      document.getElementById('about-btn').addEventListener('click', function(){ document.getElementById('about-modal').hidden = false; });
       document.getElementById('about-close').addEventListener('click', function(){ document.getElementById('about-modal').hidden = true; });
       document.getElementById('about-backdrop').addEventListener('click', function(){ document.getElementById('about-modal').hidden = true; });
       document.getElementById('import-close').addEventListener('click', closeImportModal);
@@ -1909,8 +2128,392 @@
       document.getElementById('win-max').addEventListener('click', function(){ if(isDesktop()) window.pywebview.api.maximize(); });
       document.getElementById('win-close').addEventListener('click', function(){ if(isDesktop()) window.pywebview.api.close(); });
 
+      /* =========================================================
+         合并后新增 —— 视图切换（左侧导航）
+         ========================================================= */
+      var VIEWS = ['freetime', 'accounts', 'browser', 'about'];
+
+      function currentView(){
+        var a = document.querySelector('.rail-item.active');
+        return a ? a.getAttribute('data-view') : 'freetime';
+      }
+
+      function switchView(name){
+        if(VIEWS.indexOf(name) === -1) name = 'freetime';
+        var items = document.querySelectorAll('.rail-item');
+        for(var i = 0; i < items.length; i++){
+          if(items[i].getAttribute('data-view') === name) items[i].classList.add('active');
+          else items[i].classList.remove('active');
+        }
+        for(var j = 0; j < VIEWS.length; j++){
+          var el = document.getElementById('view-' + VIEWS[j]);
+          if(!el) continue;
+          if(VIEWS[j] === name) el.classList.add('active');
+          else el.classList.remove('active');
+        }
+        updateStatusbar();
+      }
+
+      function bindRailNav(){
+        var items = document.querySelectorAll('.rail-item');
+        for(var i = 0; i < items.length; i++){
+          (function(btn){
+            btn.addEventListener('click', function(){ switchView(btn.getAttribute('data-view')); });
+          })(items[i]);
+        }
+      }
+
+      function updateRailBadges(){
+        document.getElementById('rail-people-badge').textContent = state.people.length;
+        document.getElementById('rail-acct-badge').textContent = acctState.accounts.length;
+      }
+
+      function afterDataChange(){
+        updateRailBadges();
+        renderAccounts();
+        updateStatusbar();
+      }
+
+      function updateStatusbar(){
+        var view = currentView();
+        var left = document.getElementById('status-summary');
+        var right = document.getElementById('status-week');
+        if(view === 'accounts'){
+          left.textContent = '账号存在本地 data/accounts.db，密码经 Windows DPAPI 加密';
+          right.textContent = '共 ' + acctState.accounts.length + ' 个账号';
+        } else if(view === 'browser'){
+          left.textContent = '内嵌 Chromium 内核（QtWebEngine）· 自动登录与导出都在应用窗口内完成';
+          right.textContent = browserState.loggedName ? ('已登录：' + browserState.loggedName) : '未登录';
+        } else if(view === 'about'){
+          left.textContent = 'SYNUTV · 由「教务系统管理器」与「多人空课表」合并';
+          right.textContent = 'v' + (DEFAULT_APP_INFO.version || '');
+        } else {
+          updateStatus();
+        }
+      }
+
+      /* =========================================================
+         合并后新增 —— 账号管理（来自原「教务系统管理器」）
+         ========================================================= */
+      // 浏览器直接打开预览时的兜底数据；学号与 FALLBACK_PEOPLE 对齐，
+      // 这样能同时看到「课表已入库」和「未入库」两种状态。
+      var FALLBACK_ACCOUNTS = [
+        { id:1, nickname:'卢本轩', username:'25198036', notes:'示例A组', active:true  },
+        { id:2, nickname:'王小明', username:'25198037', notes:'示例A组', active:false },
+        { id:3, nickname:'李思雨', username:'25198038', notes:'示例B组', active:false },
+        { id:4, nickname:'陈静',   username:'25198040', notes:'',        active:false }
+      ];
+
+      var acctState = { accounts: [], activeId: null, selectedId: null, mode: 'add', editId: null };
+
+      function accountById(id){
+        for(var i = 0; i < acctState.accounts.length; i++){
+          if(acctState.accounts[i].id === id) return acctState.accounts[i];
+        }
+        return null;
+      }
+
+      // 「课表是否已入库」以当前人员列表为准，与后端返回的 imported 标记取或
+      function accountImported(account){
+        if(account.imported) return true;
+        return state.people.some(function(p){
+          return p.student_id && p.student_id === account.username;
+        });
+      }
+
+      function applyAccounts(payload){
+        payload = payload || {};
+        acctState.accounts = payload.accounts || [];
+        acctState.activeId = ('active_id' in payload) ? payload.active_id : null;
+        if(acctState.selectedId === null && acctState.accounts.length){
+          acctState.selectedId = (acctState.activeId !== null && acctState.activeId !== undefined)
+            ? acctState.activeId : acctState.accounts[0].id;
+        }
+        if(acctState.selectedId !== null && !accountById(acctState.selectedId)){
+          acctState.selectedId = acctState.accounts.length ? acctState.accounts[0].id : null;
+        }
+        renderAccounts();
+      }
+
+      function loadAccounts(){
+        if(!isDesktop()){
+          var imported = {};
+          FALLBACK_PEOPLE.forEach(function(p){ imported[p.student_id] = true; });
+          applyAccounts({
+            accounts: FALLBACK_ACCOUNTS.map(function(a){
+              return { id:a.id, nickname:a.nickname, username:a.username, notes:a.notes,
+                       active:a.active, imported: !!imported[a.username] };
+            }),
+            active_id: 1
+          });
+          return Promise.resolve();
+        }
+        return window.pywebview.api.get_accounts().then(applyAccounts).catch(function(){
+          applyAccounts({ accounts: [] });
+        });
+      }
+
+      function renderAccounts(){
+        var box = document.getElementById('acct-list');
+        if(!box) return;
+        var search = document.getElementById('acct-search');
+        var q = (search && search.value ? search.value : '').trim().toLowerCase();
+        var rows = acctState.accounts.filter(function(a){
+          if(!q) return true;
+          return (a.nickname + ' ' + a.username + ' ' + (a.notes || '')).toLowerCase().indexOf(q) !== -1;
+        });
+
+        if(!acctState.accounts.length){
+          box.innerHTML = '<div class="acct-empty"><div class="t">还没有账号</div>' +
+            '<div>先添加一个教务系统账号，之后就能一键登录并导出课表。</div></div>';
+        } else if(!rows.length){
+          box.innerHTML = '<div class="acct-empty"><div>没有匹配的账号</div></div>';
+        } else {
+          box.innerHTML = rows.map(function(a){
+            var chip = accountImported(a)
+              ? '<span class="chip ok">课表已入库</span>'
+              : '<span class="chip no">课表未入库</span>';
+            var star = a.active ? '<span class="acct-star">★ 当前</span>' : '';
+            var notes = a.notes ? '<span class="acct-notes">' + esc(a.notes) + '</span>' : '';
+            return '<div class="acct-card' + (a.id === acctState.selectedId ? ' sel' : '') + '" data-id="' + a.id + '">' +
+                '<div class="acct-avatar">' + esc((a.nickname || '?').slice(0, 1)) + '</div>' +
+                '<div class="acct-main">' +
+                  '<div class="acct-name">' + esc(a.nickname) + star + chip + '</div>' +
+                  '<div class="acct-sub"><span>学号 ' + esc(a.username) + '</span>' + notes + '</div>' +
+                '</div>' +
+                '<div class="acct-acts">' +
+                  '<button class="icon-btn" data-act="active" data-id="' + a.id + '" type="button">设为当前</button>' +
+                  '<button class="icon-btn" data-act="copy" data-id="' + a.id + '" type="button">复制密码</button>' +
+                  '<button class="icon-btn" data-act="edit" data-id="' + a.id + '" type="button">编辑</button>' +
+                  '<button class="icon-btn danger" data-act="del" data-id="' + a.id + '" type="button">删除</button>' +
+                '</div>' +
+              '</div>';
+          }).join('');
+        }
+        document.getElementById('acct-count').innerHTML =
+          '共 <strong>' + acctState.accounts.length + '</strong> 个账号';
+        renderAccountDetail();
+        renderBrowserAccounts();
+        updateRailBadges();
+      }
+
+      function renderAccountDetail(){
+        var box = document.getElementById('acct-detail');
+        if(!box) return;
+        var a = accountById(acctState.selectedId);
+        if(!a){
+          box.innerHTML = '<div style="color:var(--win-text-muted);font-size:12px">未选择账号</div>';
+          return;
+        }
+        var imp = accountImported(a) ? '已入库' : '未入库';
+        box.innerHTML =
+          '<div style="font-size:15px;font-weight:600;margin:2px 0 8px">' + esc(a.nickname) + '</div>' +
+          '<div class="side-kv"><span>学号</span><span>' + esc(a.username) + '</span></div>' +
+          '<div class="side-kv"><span>备注</span><span>' + esc(a.notes || '—') + '</span></div>' +
+          '<div class="side-kv"><span>密码</span><span>DPAPI 加密</span></div>' +
+          '<div class="side-kv"><span>课表状态</span><span>' + imp + '</span></div>' +
+          '<div class="side-kv" style="border-bottom:none"><span>当前账号</span><span>' + (a.active ? '是' : '否') + '</span></div>';
+      }
+
+      function actSetActive(id){
+        if(!isDesktop()){
+          acctState.accounts.forEach(function(a){ a.active = (a.id === id); });
+          acctState.activeId = id;
+          acctState.selectedId = id;
+          renderAccounts();
+          showToast('已设为当前账号（预览模式）');
+          return;
+        }
+        window.pywebview.api.set_active_account(id).then(function(res){
+          applyAccounts(res);
+          showToast('已设为当前账号');
+        }).catch(function(e){ showToast('设置失败：' + (e && e.message ? e.message : e)); });
+      }
+
+      function actCopyPassword(id){
+        if(!isDesktop()){
+          showToast('密码已复制，30 秒后自动清空（预览模式不写真实剪贴板）');
+          return;
+        }
+        window.pywebview.api.copy_account_password(id).then(function(res){
+          if(res && res.ok) showToast('密码已复制，' + (res.cleared_in || 30) + ' 秒后自动清空剪贴板');
+          else showToast('复制失败：' + ((res && res.error) || '未知错误'));
+        }).catch(function(e){ showToast('复制失败：' + (e && e.message ? e.message : e)); });
+      }
+
+      function actDeleteAccount(id){
+        var a = accountById(id);
+        openConfirm('删除账号', '确定要删除账号「' + (a ? a.nickname : '') + '」吗？此操作不可撤销。', function(){
+          if(!isDesktop()){
+            acctState.accounts = acctState.accounts.filter(function(x){ return x.id !== id; });
+            if(acctState.selectedId === id) acctState.selectedId = null;
+            renderAccounts();
+            showToast('已删除账号（预览模式）');
+            return;
+          }
+          window.pywebview.api.delete_account(id).then(function(res){
+            applyAccounts(res);
+            showToast('已删除账号');
+          }).catch(function(e){ showToast('删除失败：' + (e && e.message ? e.message : e)); });
+        });
+      }
+
+      function openAcctModal(mode, id){
+        acctState.mode = mode || 'add';
+        acctState.editId = id || null;
+        var a = (mode === 'edit' && id) ? accountById(id) : null;
+        document.getElementById('acct-modal-title').textContent = a ? '编辑账号' : '新增账号';
+        document.getElementById('acct-f-nick').value = a ? a.nickname : '';
+        document.getElementById('acct-f-user').value = a ? a.username : '';
+        document.getElementById('acct-f-pass').value = '';
+        document.getElementById('acct-f-notes').value = a ? (a.notes || '') : '';
+        document.getElementById('acct-f-pass').placeholder = a ? '留空表示不修改密码' : '保存时由 DPAPI 加密';
+        document.getElementById('acct-modal').hidden = false;
+        document.getElementById('acct-f-nick').focus();
+      }
+
+      function closeAcctModal(){
+        document.getElementById('acct-modal').hidden = true;
+      }
+
+      function saveAccount(){
+        var nick = document.getElementById('acct-f-nick').value.trim();
+        var user = document.getElementById('acct-f-user').value.trim();
+        var pass = document.getElementById('acct-f-pass').value;
+        var notes = document.getElementById('acct-f-notes').value.trim();
+        var editing = (acctState.mode === 'edit' && acctState.editId);
+        if(!nick || !user || (!editing && !pass)){
+          showToast('昵称、用户名和密码不能为空');
+          return;
+        }
+        if(!isDesktop()){
+          if(editing){
+            var a = accountById(acctState.editId);
+            if(a){ a.nickname = nick; a.username = user; a.notes = notes; }
+          } else {
+            var nextId = 1;
+            acctState.accounts.forEach(function(x){ if(x.id >= nextId) nextId = x.id + 1; });
+            acctState.accounts.push({ id:nextId, nickname:nick, username:user, notes:notes, active:false });
+            acctState.selectedId = nextId;
+          }
+          closeAcctModal();
+          renderAccounts();
+          showToast('已保存（预览模式）');
+          return;
+        }
+        var api = window.pywebview.api;
+        var call = editing
+          ? api.update_account(acctState.editId, nick, user, pass, notes)
+          : api.add_account(nick, user, pass, notes);
+        call.then(function(res){
+          if(res && res.ok === false){ showToast('保存失败：' + (res.error || '未知错误')); return; }
+          applyAccounts(res);
+          closeAcctModal();
+          showToast(editing ? '账号已更新' : '已新增账号');
+        }).catch(function(e){ showToast('保存失败：' + (e && e.message ? e.message : e)); });
+      }
+
+      /* =========================================================
+         合并后新增 —— 课表导出页
+         ========================================================= */
+      var browserState = { urls: [], current: '', loggedName: '' };
+
+      function loadSystemUrls(){
+        if(!isDesktop()) return Promise.resolve();
+        return window.pywebview.api.get_system_urls().then(function(info){
+          browserState.urls = (info && info.urls) || [];
+          browserState.current = (info && info.current) || '';
+          var sel = document.getElementById('browser-url');
+          sel.innerHTML = browserState.urls.map(function(u){
+            return '<option value="' + esc(u.url) + '">' + esc(u.label) + ' · ' + esc(u.url) + '</option>';
+          }).join('');
+          if(browserState.current) sel.value = browserState.current;
+          renderBrowserAccounts();
+        }).catch(function(){});
+      }
+
+      function renderBrowserAccounts(){
+        var sel = document.getElementById('browser-account');
+        if(!sel) return;
+        if(!acctState.accounts.length){
+          sel.innerHTML = '<option value="">（还没有账号）</option>';
+          return;
+        }
+        sel.innerHTML = acctState.accounts.map(function(a){
+          return '<option value="' + a.id + '">' + esc(a.nickname) + ' · ' + esc(a.username) + '</option>';
+        }).join('');
+        var target = (acctState.activeId !== null && acctState.activeId !== undefined)
+          ? acctState.activeId : acctState.selectedId;
+        if(target !== null && target !== undefined) sel.value = String(target);
+      }
+
+      function browserLogin(){
+        var sel = document.getElementById('browser-account');
+        var a = sel.value ? accountById(Number(sel.value)) : null;
+        if(!a){ showToast('请先添加并选择一个账号'); return; }
+        showToast('内嵌浏览器（QtWebEngine）将在下一步接入，届时点这里会真实登录「' + a.nickname + '」。');
+      }
+
+      function browserLogout(){
+        browserState.loggedName = '';
+        updateStatusbar();
+        showToast('已清除登录状态');
+      }
+
+      function bindAccounts(){
+        document.getElementById('acct-search').addEventListener('input', renderAccounts);
+
+        document.getElementById('acct-list').addEventListener('click', function(e){
+          var target = e.target;
+          var actBtn = target.closest ? target.closest('[data-act]') : null;
+          if(actBtn){
+            var id = Number(actBtn.getAttribute('data-id'));
+            var act = actBtn.getAttribute('data-act');
+            if(act === 'active') actSetActive(id);
+            else if(act === 'copy') actCopyPassword(id);
+            else if(act === 'edit') openAcctModal('edit', id);
+            else if(act === 'del') actDeleteAccount(id);
+            return;
+          }
+          var card = target.closest ? target.closest('.acct-card') : null;
+          if(card){
+            acctState.selectedId = Number(card.getAttribute('data-id'));
+            renderAccounts();
+          }
+        });
+
+        document.getElementById('acct-add').addEventListener('click', function(){ openAcctModal('add'); });
+        document.getElementById('acct-save').addEventListener('click', saveAccount);
+        document.getElementById('acct-modal-close').addEventListener('click', closeAcctModal);
+        document.getElementById('acct-modal-cancel').addEventListener('click', closeAcctModal);
+        document.getElementById('acct-modal-backdrop').addEventListener('click', closeAcctModal);
+        document.getElementById('acct-import').addEventListener('click', function(){
+          showToast('CSV 导入将在下一步接入（需要文件对话框）');
+        });
+        document.getElementById('acct-export').addEventListener('click', function(){
+          showToast('CSV 导出将在下一步接入（需要文件对话框，且不含密码）');
+        });
+
+        document.getElementById('browser-login').addEventListener('click', browserLogin);
+        document.getElementById('browser-logout').addEventListener('click', browserLogout);
+        document.getElementById('browser-url').addEventListener('change', function(){
+          browserState.current = this.value;
+          if(isDesktop()) window.pywebview.api.set_login_url(this.value).catch(function(){});
+        });
+        document.getElementById('goto-freetime').addEventListener('click', function(){ switchView('freetime'); });
+      }
+
       populateWeekSelect();
       loadAppInfo();
+      bindRailNav();
+      bindAccounts();
+      updateStatusbar();
+      // 账号列表与教务系统地址都依赖 js_api 桥，必须等桥注入完成再拉，
+      // 否则 isDesktop() 会是 false 而误用兜底数据（踩过）。
+      waitForPywebview().then(function(){
+        loadAccounts();
+        loadSystemUrls();
+      });
       loadPeople().then(function(){
         populateSemesterSelect();
         populateGroupSelect();
@@ -1920,6 +2523,16 @@
         renderAll();
         refreshIfNeeded();
       });
+
+      // 自动化自检用的钩子：本文件所有函数都在 IIFE 内，外部（含 WebView
+      // 的 evaluate_js）访问不到，这里显式暴露几个只读入口，不影响正常功能。
+      window.__synutv = {
+        switchView: switchView,
+        loadAccounts: loadAccounts,
+        getView: currentView,
+        state: state,
+        acctState: acctState
+      };
     })();
   </script>
 </body>

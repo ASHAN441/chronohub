@@ -13,13 +13,14 @@ Qt.QueuedConnection)`，结果事件被投递到**没有事件循环的子线程
 
 from __future__ import annotations
 
-import os
 import threading
 import traceback
 from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import QMetaObject, QObject, Qt, Slot
+
+from .paths import sub_dir
 
 
 class _Invoker(QObject):
@@ -72,9 +73,7 @@ def _append_log(text: str) -> None:
     `QWebEnginePage(profile=...)` 这个错误挖出来的。
     """
     try:
-        root = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        logs = root / "data" / "logs"
-        logs.mkdir(parents=True, exist_ok=True)
+        logs = Path(sub_dir("logs"))
         stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open(logs / "qtbridge.log", "a", encoding="utf-8") as handle:
             handle.write(f"\n[{stamp}]\n{text}\n")

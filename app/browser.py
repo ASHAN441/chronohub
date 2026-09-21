@@ -42,6 +42,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .paths import sub_dir
 from .system_urls import DEFAULT_LOGIN_URL, is_login_page_url, timetable_url
 
 LOGIN_TIMEOUT_MS = 30000
@@ -52,16 +53,14 @@ FIND_HOST_RETRY_MS = 200
 FIND_HOST_MAX_TRIES = 25
 
 
-def data_root() -> Path:
-    return Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-
 def staging_dir() -> str:
     """导出的 PDF 暂存目录（位于 data/ 下，已被 gitignore）。"""
-    path = data_root() / "data" / "downloads"
-    path.mkdir(parents=True, exist_ok=True)
-    return str(path)
+    return sub_dir("downloads")
 
+
+def profile_dir() -> str:
+    """内嵌浏览器独立的 Chromium profile 目录（存 cookie / 本地存储）。"""
+    return sub_dir("jwglxt-profile")
 
 class SchoolPage(QWebEnginePage):
     """拦截页面 alert 与 window.open，交给控制器处理。"""
@@ -241,8 +240,7 @@ class EmbeddedBrowser(QObject):
 
         view = QWebEngineView()
         # 独立的 profile：不干扰 pywebview 自己的 profile，也便于自己接管下载
-        profile_path = str(data_root() / "data" / "jwglxt-profile")
-        os.makedirs(profile_path, exist_ok=True)
+        profile_path = profile_dir()
         profile = QWebEngineProfile("synutv-jwglxt", self)
         profile.setPersistentStoragePath(profile_path)
         profile.downloadRequested.connect(self._on_download_requested)

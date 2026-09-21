@@ -15,13 +15,18 @@ pywebview 的窗口本身就是一个 Qt 窗口，渲染用 QtWebEngine。
 - 同一事件循环内可再创建 QWebEngineView 窗口
 """
 
+from __future__ import annotations
+
 import os
-import sys
+import traceback
+from datetime import datetime
+from pathlib import Path
 
 import webview
 
 from .api import Api
 from .config import APP_NAME, VERSION
+from .paths import resource_dir, sub_dir
 from .people_store import storage_path
 
 # 记住 Qt 侧对象，供后续创建内嵌浏览器窗口使用
@@ -29,14 +34,8 @@ QT = {"app": None}
 
 
 def _html_path() -> str:
-    """打包后从 _MEIPASS 取 web/index.html，开发时取仓库根目录下的 web/。"""
-    if getattr(sys, "frozen", False):
-        base = getattr(
-            sys, "_MEIPASS", os.path.dirname(os.path.abspath(sys.executable))
-        )
-        return os.path.join(base, "web", "index.html")
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(root, "web", "index.html")
+    """界面文件路径。打包后从 _MEIPASS 取，开发时取项目根目录下的 web/。"""
+    return os.path.join(resource_dir(), "web", "index.html")
 
 
 def _after_start(api: Api) -> None:
@@ -54,7 +53,7 @@ def _after_start(api: Api) -> None:
     api.attach_qt(QT["app"])
 
 
-def main() -> None:
+def _run() -> None:
     api = Api()
     window = webview.create_window(
         f"{APP_NAME} v{VERSION}",
@@ -73,5 +72,53 @@ def main() -> None:
     )
 
 
+def _message_box(message: str) -> None:
+    """用 Win32 原生弹窗报错。
+
+    此时 Qt 可能根本没起来（依赖缺失、资源缺失等），所以不能依赖 Qt 的对话框。
+    """
+    try:
+        import ctypes
+
+        ctypes.windll.user32.MessageBoxW(None, message, APP_NAME, 0x10)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _report_fatal() -> str:
+    """启动失败时落盘 + 弹窗。
+
+    打包成 exe 后是 --windowed（没有控制台），异常如果只往上抛，用户双击后
+    只会看到"什么都没发生"，无从排查。所以必须写日志并弹窗告知。
+    """
+    text = traceback.format_exc()
+    log_path = None
+    try:
+        log_path = Path(sub_dir("logs")) / "startup-error.log"
+        with open(log_path, "a", encoding="utf-8") as handle:
+            stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            handle.write(f"\n[{stamp}]\n{text}\n")
+    except Exception:  # noqa: BLE001
+        log_path = None
+
+    last_line = text.strip().splitlines()[-1] if text.strip() else "未知错误"
+    hint = (
+        f"完整信息已写入：\n{log_path}"
+        if log_path
+        else "（日志写入失败，请确认程序所在目录可写）"
+    )
+    _message_box(f"{APP_NAME} 启动失败。\n\n{last_line}\n\n{hint}")
+    return text
+
+
+def main() -> int:
+    try:
+        _run()
+    except Exception:  # noqa: BLE001
+        _report_fatal()
+        return 1
+    return 0
+
+
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -34,7 +34,9 @@ venv/
 # ===== 构建产物 =====
 build/
 dist/
+# PyInstaller 自动生成的 spec 不入库，但 packaging/ 下手工维护的构建配置要入库
 *.spec
+!packaging/*.spec
 
 # ===== 临时文件 =====
 tmp/

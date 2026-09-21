@@ -1,18 +1,16 @@
 import json
 import os
-import sys
 
 from .models import Person
+from .paths import base_dir, data_dir
 
 
 def _base_dir() -> str:
     """打包成 exe 后数据放在 exe 同级目录，开发时放在项目根目录。"""
-    if getattr(sys, "frozen", False):
-        return os.path.dirname(os.path.abspath(sys.executable))
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return base_dir()
 
 
-_DATA_DIR = os.path.join(_base_dir(), "data")
+_DATA_DIR = data_dir()
 DATA_FILE = os.path.join(_DATA_DIR, "people.json")
 GROUPS_FILE = os.path.join(_DATA_DIR, "groups.json")
 

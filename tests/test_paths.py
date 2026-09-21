@@ -1,0 +1,97 @@
+"""路径解析的单元测试（打包正确性的回归保护）。
+
+为什么值得单独测：PyInstaller onefile 打包后 `__file__` 指向临时解压目录
+（`sys._MEIPASS`），重启即消失。如果可写数据被算到那里，用户下次打开会发现
+**导入的课表全没了**——这种 bug 在开发环境下永远复现不出来，只能靠测试钉住。
+"""
+
+import os
+import sys
+import unittest
+from unittest import mock
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from app import paths  # noqa: E402
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 注意要用 abspath 规整：os.path.join(os.sep, "some", ...) 在 Windows 上得到的是
+# 驱动器相对路径（\some\dir），而 paths 内部会做 abspath，两边对不上。
+FAKE_DIR = os.path.abspath(os.path.join(os.sep, "some", "dir"))
+FAKE_EXE = os.path.join(FAKE_DIR, "空课表PRO.exe")
+FAKE_MEIPASS = os.path.abspath(os.path.join(os.sep, "tmp", "_MEI123456"))
+
+
+class DevModeTest(unittest.TestCase):
+    """未打包时：项目根目录既放数据也放资源。"""
+
+    def test_not_frozen(self):
+        self.assertFalse(paths.is_frozen())
+
+    def test_root_is_project_root(self):
+        self.assertEqual(paths.base_dir(), ROOT)
+        self.assertEqual(paths.resource_dir(), ROOT)
+
+    def test_data_dir_under_project(self):
+        self.assertEqual(paths.data_dir(create=False), os.path.join(ROOT, "data"))
+
+
+class FrozenModeTest(unittest.TestCase):
+    """打包后：数据在 exe 同级，只读资源在 _MEIPASS。两者必须分开。"""
+
+    def setUp(self):
+        self._patches = [
+            mock.patch.object(paths.sys, "frozen", True, create=True),
+            mock.patch.object(paths.sys, "executable", FAKE_EXE),
+            mock.patch.object(paths.sys, "_MEIPASS", FAKE_MEIPASS, create=True),
+        ]
+        for patch in self._patches:
+            patch.start()
+        self.addCleanup(lambda: [p.stop() for p in self._patches])
+
+    def test_is_frozen(self):
+        self.assertTrue(paths.is_frozen())
+
+    def test_data_goes_next_to_exe_not_into_meipass(self):
+        self.assertEqual(paths.base_dir(), os.path.dirname(FAKE_EXE))
+        self.assertEqual(
+            paths.data_dir(create=False),
+            os.path.join(os.path.dirname(FAKE_EXE), "data"),
+        )
+        self.assertFalse(
+            paths.data_dir(create=False).startswith(FAKE_MEIPASS),
+            "数据目录绝不能落在 _MEIPASS（临时解压目录）里",
+        )
+
+    def test_resources_come_from_meipass(self):
+        self.assertEqual(paths.resource_dir(), FAKE_MEIPASS)
+
+    def test_no_meipass_falls_back_to_exe_dir(self):
+        """_MEIPASS 缺失或为空时不能崩，要退回到 exe 同级目录。"""
+        self._patches[2].stop()  # 撤掉 setUp 里对 _MEIPASS 的 patch
+        with mock.patch.object(paths.sys, "_MEIPASS", None, create=True):
+            self.assertEqual(paths.resource_dir(), FAKE_DIR)
+
+
+class ResourceLayoutTest(unittest.TestCase):
+    """界面文件必须能被找到，否则打包后是个白窗口。"""
+
+    def test_web_index_exists(self):
+        index = os.path.join(paths.resource_dir(), "web", "index.html")
+        self.assertTrue(os.path.exists(index), f"缺少界面文件：{index}")
+
+    def test_icon_exists_for_build(self):
+        icon = os.path.join(ROOT, "packaging", "空课表PRO.ico")
+        self.assertTrue(os.path.exists(icon), f"缺少打包图标：{icon}")
+
+    def test_spec_exists_and_points_at_web(self):
+        spec = os.path.join(ROOT, "packaging", "KongKeBiaoPRO.spec")
+        self.assertTrue(os.path.exists(spec))
+        with open(spec, encoding="utf-8") as handle:
+            content = handle.read()
+        self.assertIn('"web"', content, "spec 必须把 web/ 作为数据一起打包")
+        self.assertIn("console=False", content, "窗口程序不应留控制台")
+
+
+if __name__ == "__main__":
+    unittest.main()

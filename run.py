@@ -1,4 +1,4 @@
-"""SYNUTV 启动入口。
+"""空课表PRO 启动入口。
 
 双击 run.bat 或执行：
     python run.py

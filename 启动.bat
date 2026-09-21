@@ -1,6 +1,6 @@
 @echo off
 rem ==================================================================
-rem  SYNUTV  -  double click this file to start the application.
+rem  KongKeBiaoPRO  -  double click this file to start the application.
 rem
 rem  First run : finds a Python that has every dependency, installs
 rem              the dependencies if needed, then remembers the
@@ -12,11 +12,13 @@ rem              resolves the interpreter without starting the app
 rem  Reset     : delete .runtime, then run again
 rem
 rem  Note: keep this file pure ASCII. cmd.exe reads .bat with the OEM
-rem  code page, so UTF-8 comments would show up as mojibake.
+rem  code page, so UTF-8 comments would show up as mojibake. That is also
+rem  why the product name is written here as "KongKeBiaoPRO" instead of the
+rem  Chinese original; the app window shows the real name.
 rem ==================================================================
 setlocal EnableExtensions
 cd /d "%~dp0"
-title SYNUTV
+title KongKeBiaoPRO
 
 set "STAMP=.runtime"
 set "CHECK=%~dp0tools\check_deps.py"
@@ -33,7 +35,7 @@ if defined PYEXE (
 
 rem ---------- setup ----------
 echo.
-echo   SYNUTV - first time setup
+echo   KongKeBiaoPRO - first time setup
 echo   ----------------------------------------------------------
 echo.
 
@@ -119,7 +121,7 @@ set "PYWEXE=%PYEXE:python.exe=pythonw.exe%"
 
 if /i "%~1"=="--check" (
     echo.
-    echo   ---- SYNUTV launcher check ----
+    echo   ---- KongKeBiaoPRO launcher check ----
     echo   interpreter : %PYEXE%
     echo   pythonw     : %PYWEXE%
     if exist "%PYWEXE%" (
@@ -137,13 +139,13 @@ rem pythonw keeps the console window out of the way. If it is not
 rem available, for example with a non python.org build, fall back to
 rem plain python, which shows a console window while the app runs.
 if exist "%PYWEXE%" (
-    start "SYNUTV" /d "%~dp0" "%PYWEXE%" "%~dp0run.py"
+    start "KongKeBiaoPRO" /d "%~dp0" "%PYWEXE%" "%~dp0run.py"
 ) else if /i "%PYEXE%"=="py -3" (
-    start "SYNUTV" /d "%~dp0" py -3 "%~dp0run.py"
+    start "KongKeBiaoPRO" /d "%~dp0" py -3 "%~dp0run.py"
 ) else if /i "%PYEXE%"=="python" (
-    start "SYNUTV" /d "%~dp0" python "%~dp0run.py"
+    start "KongKeBiaoPRO" /d "%~dp0" python "%~dp0run.py"
 ) else (
-    start "SYNUTV" /d "%~dp0" "%PYEXE%" "%~dp0run.py"
+    start "KongKeBiaoPRO" /d "%~dp0" "%PYEXE%" "%~dp0run.py"
 )
 
 endlocal

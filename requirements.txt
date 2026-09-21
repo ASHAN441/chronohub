@@ -1,4 +1,4 @@
-# SYNUTV 运行依赖
+# 空课表PRO 运行依赖
 #
 # pywebview 需要收紧版本区间：内嵌教务系统页面依赖它的内部结构
 # （Qt 后端的窗口是 QMainWindow、webview 是其 centralWidget），大版本升级

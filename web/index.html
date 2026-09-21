@@ -443,7 +443,7 @@
             <div class="about-big-version" id="about-big-version">v3.0</div>
             <div class="about-note" id="about-note"></div>
             <div class="about-grid">
-              <div class="about-cell"><b>账号与安全</b><span>账号存 SQLite，密码用 Windows DPAPI 加密，只有当前 Windows 用户能解密</span></div>
+              <div class="about-cell"><b>账号与安全</b><span>账号存 SQLite，密码用 Windows DPAPI 加密</span></div>
               <div class="about-cell"><b>课表解析</b><span>支持网格版式与列表版式两种 PDF，自动展开单双周与周次区间</span></div>
               <div class="about-cell"><b>本地优先</b><span>全部数据存在本地 data/ 目录，不上传任何服务器</span></div>
               <div class="about-cell"><b>内嵌浏览器</b><span>Chromium 内核（QtWebEngine），自动登录与导出课表都在应用窗口内完成</span></div>
@@ -1638,10 +1638,10 @@
         var bigName = document.getElementById('about-big-name');
         if(bigName) bigName.textContent = info.name;
         var bigVer = document.getElementById('about-big-version');
-        if(bigVer) bigVer.textContent = 'v' + info.version + (info.merged_from ? ' · ' + info.merged_from : '');
+        if(bigVer) bigVer.textContent = 'v' + info.version;
         var note = document.getElementById('about-note');
         if(note){
-          note.innerHTML = '一个应用管完全程：账号管理 → 自动登录 → 导出课表 → 解析入库 → 多人空闲统计。<br>' +
+          note.innerHTML = '多人空闲统计。<br>' +
             (info.org ? esc(info.org) + ' 出品 · ' : '') +
             '开发者：' + esc(info.developer || '') + ' · ' + esc(info.contact || '') + ' · ' + esc(info.copyright || '');
         }

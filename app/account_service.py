@@ -11,15 +11,20 @@ from __future__ import annotations
 import os
 
 from .accounts import AccountStore
+from .paths import data_dir
 from .security import DpapiEncryptor, EncryptionError
 
 SETTING_LOGIN_URL = "login_url"
 
 
 def default_db_path() -> str:
-    """账号库默认放在项目根目录的 data/accounts.db（该目录已被 gitignore）。"""
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(root, "data", "accounts.db")
+    """账号库默认放在 data/accounts.db（打包后位于 exe 同级目录）。
+
+    必须走 paths.data_dir()：用 __file__ 推算的话，onefile 打包后会落到临时
+    解压目录，重启即丢——**用户存的账号全没了**。这个 bug 是打包后实测
+    「exe 同级只生成了 data/webview，没有 accounts.db」才发现的。
+    """
+    return os.path.join(data_dir(), "accounts.db")
 
 
 class AccountService:

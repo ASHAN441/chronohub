@@ -93,5 +93,71 @@ class ResourceLayoutTest(unittest.TestCase):
         self.assertIn("console=False", content, "窗口程序不应留控制台")
 
 
+class DataPathConsumersTest(unittest.TestCase):
+    """所有**可写**路径都必须派生自 paths.data_dir()。
+
+    这是打包后实测踩到的：exe 同级只生成了 data/webview，没有 accounts.db——
+    因为 account_service 还在用 __file__ 推算路径，账号库被建到了临时解压目录，
+    **重启就丢账号**。这里把每一个可写路径都钉住。
+    """
+
+    def setUp(self):
+        self.data_dir = os.path.normcase(paths.data_dir(create=False))
+
+    def test_account_db_is_under_data_dir(self):
+        from app.account_service import default_db_path
+
+        self.assertEqual(
+            os.path.normcase(os.path.dirname(default_db_path())),
+            self.data_dir,
+            "账号库必须放在 data/ 下（打包后即 exe 同级）",
+        )
+
+    def test_people_and_groups_files_are_under_data_dir(self):
+        from app.people_store import DATA_FILE, GROUPS_FILE
+
+        for path in (DATA_FILE, GROUPS_FILE):
+            self.assertEqual(
+                os.path.normcase(os.path.dirname(path)),
+                self.data_dir,
+                f"{os.path.basename(path)} 必须放在 data/ 下",
+            )
+
+    def test_pdf_staging_dir_is_under_data_dir(self):
+        from app.browser import staging_dir
+
+        self.assertEqual(
+            os.path.normcase(os.path.dirname(staging_dir())),
+            self.data_dir,
+            "导出的 PDF 暂存目录必须放在 data/ 下",
+        )
+
+    def test_browser_profile_dir_is_under_data_dir(self):
+        from app.browser import profile_dir
+
+        self.assertEqual(
+            os.path.normcase(os.path.dirname(profile_dir())),
+            self.data_dir,
+            "内嵌浏览器的 profile 必须放在 data/ 下",
+        )
+
+    def test_no_module_recomputes_project_root_from_file(self):
+        """除了 paths.py，任何模块都不该再用 __file__ 推算项目根。"""
+        app_dir = os.path.join(ROOT, "app")
+        offenders = []
+        for name in sorted(os.listdir(app_dir)):
+            if not name.endswith(".py") or name == "paths.py":
+                continue
+            with open(os.path.join(app_dir, name), encoding="utf-8") as handle:
+                content = handle.read()
+            if "abspath(__file__)" in content:
+                offenders.append(name)
+        self.assertEqual(
+            offenders,
+            [],
+            f"这些模块还在用 __file__ 推算路径，打包后会写进临时目录：{offenders}",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

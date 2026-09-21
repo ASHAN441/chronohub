@@ -1,6 +1,5 @@
 import tkinter as tk
 import os
-import sys
 import threading
 from tkinter import filedialog
 
@@ -8,6 +7,7 @@ from .account_service import AccountService
 from .clipboard import set_text_temporary
 from .config import app_info
 from .parser import PARSER_VERSION, parse_pdf
+from .paths import base_dir
 from .people_store import (
     DATA_FILE,
     GROUPS_FILE,
@@ -142,12 +142,8 @@ class Api:
     @staticmethod
     def _search_dirs() -> list:
         """可能存放课表 PDF 的目录（程序目录、上级目录以及其中的「课表」文件夹）。"""
-        if getattr(sys, "frozen", False):
-            base = os.path.dirname(os.path.abspath(sys.executable))
-            roots = [base, os.path.dirname(base)]
-        else:
-            base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            roots = [base, os.path.dirname(base)]
+        base = base_dir()
+        roots = [base, os.path.dirname(base)]
         dirs = []
         for root in roots:
             for candidate in (root, os.path.join(root, "课表")):

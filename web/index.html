@@ -241,6 +241,17 @@
     .import-card .ic-sub{ font-size:12px; color:var(--win-text-muted); margin-top:2px; line-height:1.6; }
     .import-card .ic-arrow{ font-size:16px; color:var(--win-text-muted); flex:none; }
 
+    /* 内嵌浏览器状态面板 */
+    .browser-status{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px; text-align:center; padding:28px; }
+    .bs-badge{ font-size:11px; padding:2px 10px; border-radius:999px; border:1px solid var(--win-border); color:var(--win-text-muted); background:var(--win-surface-2); }
+    .bs-badge.ok{ color:var(--win-free); background:color-mix(in srgb, var(--win-free) 13%, var(--win-surface)); border-color:color-mix(in srgb, var(--win-free) 38%, var(--win-border)); }
+    .bs-badge.busy{ color:var(--win-accent); background:var(--win-accent-soft); border-color:color-mix(in srgb, var(--win-accent) 40%, var(--win-border)); }
+    .bs-badge.err{ color:#c42b1c; background:color-mix(in srgb, #c42b1c 12%, var(--win-surface)); border-color:color-mix(in srgb, #c42b1c 40%, var(--win-border)); }
+    .bs-title{ font-size:15px; font-weight:500; }
+    .bs-sub{ font-size:12.5px; color:var(--win-text-muted); max-width:560px; line-height:1.8; }
+    .bs-error{ font-size:12.5px; color:#c42b1c; background:color-mix(in srgb, #c42b1c 9%, var(--win-surface)); border:1px solid color-mix(in srgb, #c42b1c 32%, var(--win-border)); border-radius:6px; padding:8px 12px; max-width:560px; }
+    .bs-error[hidden]{ display:none; }
+
     /* ================= 合并后新增：关于页 ================= */
     .about-view{ flex:1; display:flex; align-items:center; justify-content:center; padding:24px; overflow:auto; }
     .about-box{ text-align:center; max-width:560px; }
@@ -389,19 +400,22 @@
             <select class="tb-select" id="browser-url"></select>
           </label>
           <button class="tb-btn primary" id="browser-login" type="button">打开并登录</button>
+          <button class="tb-btn" id="browser-export" type="button">导出课表 PDF</button>
           <span class="tb-sep"></span>
-          <button class="tb-btn" id="browser-logout" type="button">清除登录状态</button>
+          <button class="tb-btn" id="browser-logout" type="button">关闭浏览器</button>
           <span class="tb-spacer"></span>
           <span class="tb-info" id="browser-hint">尚未登录</span>
         </div>
         <div class="browser-body">
           <div class="mock-win">
-            <div class="browser-placeholder" id="browser-placeholder">
-              <div class="ph-title">内嵌浏览器待接入</div>
-              <div class="ph-sub" id="browser-placeholder-sub">
-                这块由 PySide6 的 QtWebEngine 承载，复用原「教务系统管理器」的自动登录注入与 PDF 下载接管逻辑。
-                当前骨架先把界面和账号链路打通，浏览器窗口在下一步接入。
+            <div class="browser-status" id="browser-status">
+              <div class="bs-badge" id="browser-badge">未登录</div>
+              <div class="bs-title" id="browser-status-title">内嵌浏览器未打开</div>
+              <div class="bs-sub" id="browser-status-sub">
+                点「打开并登录」会弹出一个独立的 Chromium 窗口（QtWebEngine），自动填入账号密码登录教务系统。
+                登录后点「导出课表 PDF」，导出的文件会自动解析并合并进「空课表」，不需要再手动选文件。
               </div>
+              <div class="bs-error" id="browser-status-error" hidden></div>
             </div>
           </div>
           <div class="import-card">
@@ -2151,6 +2165,8 @@
           if(VIEWS[j] === name) el.classList.add('active');
           else el.classList.remove('active');
         }
+        // 切到课表导出页时拉一次浏览器状态
+        if(name === 'browser') ensureBrowserPoll();
         updateStatusbar();
       }
 
@@ -2416,7 +2432,139 @@
       /* =========================================================
          合并后新增 —— 课表导出页
          ========================================================= */
-      var browserState = { urls: [], current: '', loggedName: '' };
+      var browserState = { urls: [], current: '', loggedName: '', last: null };
+      var browserPoll = null;
+
+      var DEFAULT_BROWSER_HINT =
+        '点「打开并登录」会弹出一个独立的 Chromium 窗口（QtWebEngine），自动填入账号密码登录教务系统。' +
+        '登录后点「导出课表 PDF」，导出的文件会自动解析并合并进「空课表」，不需要再手动选文件。';
+
+      function ensureBrowserPoll(){
+        if(browserPoll || !isDesktop()) return;
+        browserPoll = setInterval(pollBrowserStatus, 1500);
+      }
+
+      function stopBrowserPoll(){
+        if(browserPoll){ clearInterval(browserPoll); browserPoll = null; }
+      }
+
+      function pollBrowserStatus(){
+        if(!isDesktop()) return;
+        window.pywebview.api.get_browser_status().then(function(payload){
+          applyBrowserStatus(payload);
+          var st = (payload && payload.browser) || {};
+          // 浏览器已关闭且没有正在进行的任务，就停止轮询，别一直空转
+          if(!st.open && !st.busy) stopBrowserPoll();
+        }).catch(function(){});
+      }
+
+      function browserBadge(st){
+        if(st.error) return { text: '出错', cls: 'err' };
+        if(st.busy) return { text: '进行中', cls: 'busy' };
+        if(st.logged_in) return { text: '已登录', cls: 'ok' };
+        if(st.open) return { text: '已打开', cls: '' };
+        return { text: '未登录', cls: '' };
+      }
+
+      function applyBrowserStatus(payload){
+        var st = (payload && payload.browser) || {};
+        browserState.last = st;
+        browserState.loggedName = st.logged_in ? (st.account || '') : '';
+
+        if(payload && payload.imported) handleAutoImport(payload);
+
+        var info = browserBadge(st);
+        var badge = document.getElementById('browser-badge');
+        badge.textContent = info.text;
+        badge.className = 'bs-badge' + (info.cls ? ' ' + info.cls : '');
+
+        var title = document.getElementById('browser-status-title');
+        var sub = document.getElementById('browser-status-sub');
+        if(st.error){
+          title.textContent = '出错了';
+          sub.textContent = '按上面的提示处理后可以再试一次。';
+        } else if(st.stage){
+          title.textContent = st.stage;
+          sub.textContent = st.message || '处理中，请稍候…';
+        } else if(st.logged_in){
+          title.textContent = st.message || '已登录教务系统';
+          sub.textContent = '现在可以点「导出课表 PDF」，导出的文件会自动解析入库。';
+        } else if(st.open){
+          title.textContent = '浏览器已打开，等待登录';
+          sub.textContent = '请在浏览器窗口中完成登录，或点「打开并登录」自动填入账号密码。';
+        } else {
+          title.textContent = '内嵌浏览器未打开';
+          sub.textContent = DEFAULT_BROWSER_HINT;
+        }
+
+        var err = document.getElementById('browser-status-error');
+        err.textContent = st.error || '';
+        err.hidden = !st.error;
+
+        document.getElementById('browser-hint').innerHTML = st.logged_in
+          ? ('已登录' + (st.account ? '：<strong>' + esc(st.account) + '</strong>' : ''))
+          : (st.busy ? '处理中…' : '尚未登录');
+        updateStatusbar();
+      }
+
+      function handleAutoImport(payload){
+        var r = payload.imported || {};
+        if(payload.people) state.people = payload.people;
+        if(payload.groups) state.groups = payload.groups;
+        renderAll();      // 空课表视图随之刷新
+        loadAccounts();   // 账号页的「课表已入库」标签随之刷新
+
+        if(r.ok){
+          var name = r.name || '未命名';
+          var courses = r.courses || 0;
+          document.getElementById('import-card-sub').innerHTML =
+            '最近入库：<strong>' + esc(name) + '</strong> · ' + courses +
+            ' 门课程 · 当前共 ' + state.people.length + ' 人';
+          showToast('课表已自动入库：' + name + '（' + courses + ' 门课程）',
+            '去看空课表', function(){ switchView('freetime'); });
+        } else {
+          showToast('课表入库失败：' + (r.error || '未知错误'));
+        }
+      }
+
+      function browserLogin(){
+        var sel = document.getElementById('browser-account');
+        var a = sel.value ? accountById(Number(sel.value)) : null;
+        if(!a){ showToast('请先添加并选择一个账号'); return; }
+        if(!isDesktop()){
+          showToast('预览模式下无法打开内嵌浏览器，请用 启动.bat 运行程序后再试');
+          return;
+        }
+        var url = document.getElementById('browser-url').value;
+        if(url) window.pywebview.api.set_login_url(url).catch(function(){});
+        window.pywebview.api.browser_login(a.id).then(function(res){
+          if(res && res.ok === false){ showToast('登录失败：' + (res.error || '未知错误')); return; }
+          showToast('正在打开浏览器并登录「' + a.nickname + '」…');
+          ensureBrowserPoll();
+          pollBrowserStatus();
+        }).catch(function(e){ showToast('登录失败：' + (e && e.message ? e.message : e)); });
+      }
+
+      function browserExport(){
+        if(!isDesktop()){
+          showToast('预览模式下无法导出，请用 启动.bat 运行程序后再试');
+          return;
+        }
+        window.pywebview.api.browser_export().then(function(res){
+          if(res && res.ok === false){ showToast('导出失败：' + (res.error || '未知错误')); return; }
+          showToast('已开始导出课表 PDF…');
+          ensureBrowserPoll();
+          pollBrowserStatus();
+        }).catch(function(e){ showToast('导出失败：' + (e && e.message ? e.message : e)); });
+      }
+
+      function browserLogout(){
+        if(isDesktop()) window.pywebview.api.browser_close().catch(function(){});
+        browserState.loggedName = '';
+        stopBrowserPoll();
+        applyBrowserStatus({ browser: { open: false, logged_in: false, busy: false, stage: '', message: '', error: '' } });
+        showToast('已关闭内嵌浏览器');
+      }
 
       function loadSystemUrls(){
         if(!isDesktop()) return Promise.resolve();
@@ -2445,19 +2593,6 @@
         var target = (acctState.activeId !== null && acctState.activeId !== undefined)
           ? acctState.activeId : acctState.selectedId;
         if(target !== null && target !== undefined) sel.value = String(target);
-      }
-
-      function browserLogin(){
-        var sel = document.getElementById('browser-account');
-        var a = sel.value ? accountById(Number(sel.value)) : null;
-        if(!a){ showToast('请先添加并选择一个账号'); return; }
-        showToast('内嵌浏览器（QtWebEngine）将在下一步接入，届时点这里会真实登录「' + a.nickname + '」。');
-      }
-
-      function browserLogout(){
-        browserState.loggedName = '';
-        updateStatusbar();
-        showToast('已清除登录状态');
       }
 
       function bindAccounts(){
@@ -2495,6 +2630,7 @@
         });
 
         document.getElementById('browser-login').addEventListener('click', browserLogin);
+        document.getElementById('browser-export').addEventListener('click', browserExport);
         document.getElementById('browser-logout').addEventListener('click', browserLogout);
         document.getElementById('browser-url').addEventListener('change', function(){
           browserState.current = this.value;
@@ -2529,6 +2665,7 @@
       window.__synutv = {
         switchView: switchView,
         loadAccounts: loadAccounts,
+        applyBrowserStatus: applyBrowserStatus,
         getView: currentView,
         state: state,
         acctState: acctState

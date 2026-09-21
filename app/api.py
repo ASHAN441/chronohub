@@ -17,6 +17,7 @@ from .people_store import (
     save_groups,
     save_people,
 )
+from .qtbridge import QtBridge, last_error
 from .system_urls import DEFAULT_LOGIN_URL, SYSTEM_URLS
 
 
@@ -31,6 +32,8 @@ class Api:
     ):
         self._window = None
         self._qt_app = None
+        self._bridge = None
+        self._browser = None
         self.data_path = data_path or DATA_FILE
         self.groups_path = groups_path or GROUPS_FILE
         self.people, self.parser_version = load_data(self.data_path)
@@ -43,11 +46,19 @@ class Api:
     def attach_qt(self, qt_app) -> None:
         """由 app.main 在 GUI 启动后注入 Qt QApplication 实例。
 
-        教务系统的内嵌浏览器需要它：所有 Qt 控件都必须在主线程创建，
-        而 pywebview 的 js_api 方法运行在子线程，届时要用
-        `QMetaObject.invokeMethod` 把建窗动作投递回主线程。
+        注入后建立通往 Qt 主线程的投递桥，并在主线程里创建内嵌浏览器控制器
+        （QTimer 等必须在有事件循环的线程里创建）。
         """
         self._qt_app = qt_app
+        self._bridge = QtBridge(qt_app)
+        self._bridge.run(self._create_browser)
+
+    def _create_browser(self) -> None:
+        """在 Qt 主线程里创建浏览器控制器。延迟导入，避免无谓加载 QtWebEngine。"""
+        from .browser import BrowserController
+
+        if self._browser is None:
+            self._browser = BrowserController()
 
     @staticmethod
     def _idle_import_state() -> dict:
@@ -502,6 +513,138 @@ class Api:
             "ok": True,
             "current": self.accounts.get_login_url(DEFAULT_LOGIN_URL),
         }
+
+    # ============ 课表导出（内嵌浏览器 + 导出后自动入库） ============
+
+    def _import_pdf_path(self, path: str, group: str = "") -> dict:
+        """解析一个课表 PDF 并合并进人员列表。
+
+        浏览器导出后自动入库、以及外部直接导入，都走这里。
+        """
+        try:
+            person = self._load_person(path, group or "")
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "path": path, "error": str(exc)}
+
+        existed = any(self._same_person(p, person) for p in self.people)
+        self._merge(person)
+        save_people(self.people, self.data_path)
+        if person.group and not self._has_group(person.group):
+            self.groups.append({"name": person.group, "parent": ""})
+            save_groups(self.groups, self.groups_path)
+        self.parser_version = max([p.parsed_with or 0 for p in self.people] or [0])
+        return {
+            "ok": True,
+            "path": path,
+            "name": person.name,
+            "student_id": person.student_id,
+            "courses": len(person.courses),
+            "updated": existed,
+        }
+
+    def import_schedule_pdf(self, path: str, group: str = "") -> dict:
+        """把一个课表 PDF 解析入库（不弹文件对话框，便于外部调用与测试）。"""
+        result = self._import_pdf_path(path, group)
+        self._notify_browser_import(result)
+        payload = {"imported": result}
+        payload["people"] = self.get_people()
+        payload["groups"] = self.get_groups()
+        return payload
+
+    def _consume_pending_import(self) -> dict | None:
+        """取走浏览器下载完的 PDF 并入库；没有待处理项时返回 None。"""
+        if self._browser is None:
+            return None
+        path = self._browser.take_pending_import()
+        if not path:
+            return None
+        result = self._import_pdf_path(path)
+        self._notify_browser_import(result)
+        return result
+
+    def _notify_browser_import(self, result: dict) -> None:
+        """把入库结果回写到浏览器窗口的提示区（必须在主线程执行）。"""
+        if self._bridge is None or self._browser is None:
+            return
+        if result.get("ok"):
+            name = result.get("name") or "未命名"
+            courses = int(result.get("courses") or 0)
+            self._bridge.run(
+                lambda: self._browser.note_imported(name, courses)
+            )
+        else:
+            message = result.get("error") or "解析失败"
+            self._bridge.run(lambda: self._browser.note_import_failed(message))
+
+    def get_browser_status(self) -> dict:
+        """前端轮询用。顺带把已下载完的课表 PDF 解析入库。"""
+        status = (
+            self._browser.status()
+            if self._browser is not None
+            else {
+                "open": False,
+                "logged_in": False,
+                "busy": False,
+                "stage": "",
+                "message": "",
+                "error": "",
+            }
+        )
+        if self._browser is not None:
+            error = last_error()
+            if error:
+                status["error"] = error.strip().splitlines()[-1]
+
+        payload = {"browser": status}
+        imported = self._consume_pending_import()
+        if imported is not None:
+            payload["imported"] = imported
+            payload["people"] = self.get_people()
+            payload["groups"] = self.get_groups()
+        return payload
+
+    def browser_login(self, account_id) -> dict:
+        if self._bridge is None or self._browser is None:
+            return {"ok": False, "error": "浏览器还没准备好，请稍后重试"}
+        try:
+            account_id = int(account_id)
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "账号参数无效"}
+
+        target = next(
+            (a for a in self.accounts.list_accounts() if a["id"] == account_id), None
+        )
+        if target is None:
+            return {"ok": False, "error": "账号不存在"}
+        got = self.accounts.get_password(account_id)
+        if not got.get("ok"):
+            return {"ok": False, "error": got.get("error", "无法读取密码")}
+
+        nickname = target["nickname"]
+        username = target["username"]
+        password = got["password"]
+        url = self.accounts.get_login_url(DEFAULT_LOGIN_URL)
+        self._bridge.run(lambda: self._browser.login(nickname, username, password, url))
+        return {"ok": True, "account": nickname}
+
+    def browser_export(self) -> dict:
+        if self._bridge is None or self._browser is None:
+            return {"ok": False, "error": "浏览器还没准备好，请稍后重试"}
+        url = self.accounts.get_login_url(DEFAULT_LOGIN_URL)
+        self._bridge.run(lambda: self._browser.export_schedule(url))
+        return {"ok": True}
+
+    def browser_open(self) -> dict:
+        if self._bridge is None or self._browser is None:
+            return {"ok": False, "error": "浏览器还没准备好，请稍后重试"}
+        url = self.accounts.get_login_url(DEFAULT_LOGIN_URL)
+        self._bridge.run(lambda: self._browser.open(url))
+        return {"ok": True}
+
+    def browser_close(self) -> dict:
+        if self._bridge is not None and self._browser is not None:
+            self._bridge.run(self._browser.close)
+        return {"ok": True}
 
     def minimize(self) -> None:
         if self._window is not None:

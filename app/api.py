@@ -54,11 +54,11 @@ class Api:
         self._bridge.run(self._create_browser)
 
     def _create_browser(self) -> None:
-        """在 Qt 主线程里创建浏览器控制器。延迟导入，避免无谓加载 QtWebEngine。"""
-        from .browser import BrowserController
+        """在 Qt 主线程里创建内嵌浏览器。延迟导入，避免无谓加载 QtWebEngine。"""
+        from .browser import EmbeddedBrowser
 
         if self._browser is None:
-            self._browser = BrowserController()
+            self._browser = EmbeddedBrowser()
 
     @staticmethod
     def _idle_import_state() -> dict:
@@ -638,7 +638,13 @@ class Api:
         if self._bridge is None or self._browser is None:
             return {"ok": False, "error": "浏览器还没准备好，请稍后重试"}
         url = self.accounts.get_login_url(DEFAULT_LOGIN_URL)
-        self._bridge.run(lambda: self._browser.open(url))
+        self._bridge.run(lambda: self._browser.open_page(url))
+        return {"ok": True}
+
+    def browser_hide(self) -> dict:
+        """收起内嵌页面，把界面还给应用（不销毁页面，登录状态保留）。"""
+        if self._bridge is not None and self._browser is not None:
+            self._bridge.run(self._browser.hide)
         return {"ok": True}
 
     def browser_close(self) -> dict:

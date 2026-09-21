@@ -13,8 +13,11 @@ Qt.QueuedConnection)`，结果事件被投递到**没有事件循环的子线程
 
 from __future__ import annotations
 
+import os
 import threading
 import traceback
+from datetime import datetime
+from pathlib import Path
 
 from PySide6.QtCore import QMetaObject, QObject, Qt, Slot
 
@@ -58,6 +61,25 @@ def _record_error(text: str) -> None:
     global _last_error
     with _error_lock:
         _last_error = text
+    _append_log(text)
+
+
+def _append_log(text: str) -> None:
+    """把主线程异常追加进 data/logs/qtbridge.log。
+
+    为什么必须落盘：程序用 pythonw 启动时没有控制台，异常又是在 Qt 事件循环里
+    抛出的，不写文件的话用户完全看不到——实测就是靠临时探测才把
+    `QWebEnginePage(profile=...)` 这个错误挖出来的。
+    """
+    try:
+        root = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        logs = root / "data" / "logs"
+        logs.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(logs / "qtbridge.log", "a", encoding="utf-8") as handle:
+            handle.write(f"\n[{stamp}]\n{text}\n")
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def last_error() -> str | None:

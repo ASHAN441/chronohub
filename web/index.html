@@ -281,15 +281,15 @@
 
   <div class="shell">
     <nav class="rail">
-      <button class="rail-item active" data-view="freetime" type="button">
-        <svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.2"/><path d="M3 9.5h18M9 9.5V20.5M15 9.5V20.5"/></svg>
-        空课表
-        <span class="rail-badge" id="rail-people-badge">0</span>
-      </button>
-      <button class="rail-item" data-view="accounts" type="button">
+      <button class="rail-item active" data-view="accounts" type="button">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-3.6 3.4-6.2 7.5-6.2s7.5 2.6 7.5 6.2"/></svg>
         账号
         <span class="rail-badge" id="rail-acct-badge">0</span>
+      </button>
+      <button class="rail-item" data-view="freetime" type="button">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.2"/><path d="M3 9.5h18M9 9.5V20.5M15 9.5V20.5"/></svg>
+        空课表
+        <span class="rail-badge" id="rail-people-badge">0</span>
       </button>
       <button class="rail-item" data-view="browser" type="button">
         <svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2.2"/><path d="M3 9h18"/><path d="M7 6.7h.01M9.6 6.7h.01"/></svg>
@@ -305,7 +305,7 @@
     <div class="view-wrap">
       <!-- 说明：下面这个「空课表」视图是从原 空课表/web/index.html 原样搬运的，
            为保持 diff 可读，内容未做缩进调整。 -->
-      <section class="view active" id="view-freetime">
+      <section class="view" id="view-freetime">
   <div class="win-toolbar">
     <button class="tb-btn primary" id="import-btn" type="button">导入课表</button>
     <button class="tb-btn" id="export-btn" type="button">导出</button>
@@ -364,7 +364,7 @@
       </section>
 
       <!-- ============ 账号管理（来自原「教务系统管理器」） ============ -->
-      <section class="view" id="view-accounts">
+      <section class="view active" id="view-accounts">
         <div class="win-toolbar">
           <button class="tb-btn primary" id="acct-add" type="button">＋ 新增账号</button>
           <button class="tb-btn" id="acct-import" type="button">导入 CSV</button>
@@ -402,7 +402,8 @@
           <button class="tb-btn primary" id="browser-login" type="button">打开并登录</button>
           <button class="tb-btn" id="browser-export" type="button">导出课表 PDF</button>
           <span class="tb-sep"></span>
-          <button class="tb-btn" id="browser-logout" type="button">关闭浏览器</button>
+          <button class="tb-btn" id="browser-hide" type="button">返回应用</button>
+          <button class="tb-btn" id="browser-logout" type="button">退出登录</button>
           <span class="tb-spacer"></span>
           <span class="tb-info" id="browser-hint">尚未登录</span>
         </div>
@@ -412,7 +413,7 @@
               <div class="bs-badge" id="browser-badge">未登录</div>
               <div class="bs-title" id="browser-status-title">内嵌浏览器未打开</div>
               <div class="bs-sub" id="browser-status-sub">
-                点「打开并登录」会弹出一个独立的 Chromium 窗口（QtWebEngine），自动填入账号密码登录教务系统。
+                点「打开并登录」，教务系统页面会直接显示在这个窗口里（内嵌 Chromium），并自动填入账号密码。
                 登录后点「导出课表 PDF」，导出的文件会自动解析并合并进「空课表」，不需要再手动选文件。
               </div>
               <div class="bs-error" id="browser-status-error" hidden></div>
@@ -2436,8 +2437,9 @@
       var browserPoll = null;
 
       var DEFAULT_BROWSER_HINT =
-        '点「打开并登录」会弹出一个独立的 Chromium 窗口（QtWebEngine），自动填入账号密码登录教务系统。' +
-        '登录后点「导出课表 PDF」，导出的文件会自动解析并合并进「空课表」，不需要再手动选文件。';
+        '点「打开并登录」，教务系统页面会直接显示在这个窗口里（内嵌 Chromium），并自动填入账号密码。' +
+        '登录后点「导出课表 PDF」，导出的文件会自动解析并合并进「空课表」，不需要再手动选文件。' +
+        '内嵌页面显示时，可以用它顶部的「← 返回 SYNUTV」回到应用。';
 
       function ensureBrowserPoll(){
         if(browserPoll || !isDesktop()) return;
@@ -2490,8 +2492,8 @@
           title.textContent = st.message || '已登录教务系统';
           sub.textContent = '现在可以点「导出课表 PDF」，导出的文件会自动解析入库。';
         } else if(st.open){
-          title.textContent = '浏览器已打开，等待登录';
-          sub.textContent = '请在浏览器窗口中完成登录，或点「打开并登录」自动填入账号密码。';
+          title.textContent = '内嵌页面已打开，等待登录';
+          sub.textContent = '请在内嵌页面里完成登录，或点「打开并登录」自动填入账号密码。';
         } else {
           title.textContent = '内嵌浏览器未打开';
           sub.textContent = DEFAULT_BROWSER_HINT;
@@ -2558,12 +2560,25 @@
         }).catch(function(e){ showToast('导出失败：' + (e && e.message ? e.message : e)); });
       }
 
+      function browserHide(){
+        if(isDesktop()) window.pywebview.api.browser_hide().catch(function(){});
+        stopBrowserPoll();
+        var last = browserState.last || {};
+        applyBrowserStatus({ browser: {
+          open: false,
+          logged_in: !!last.logged_in,
+          account: last.account || '',
+          busy: false, stage: '', message: '', error: ''
+        } });
+        showToast('已返回应用，登录状态保留');
+      }
+
       function browserLogout(){
         if(isDesktop()) window.pywebview.api.browser_close().catch(function(){});
         browserState.loggedName = '';
         stopBrowserPoll();
         applyBrowserStatus({ browser: { open: false, logged_in: false, busy: false, stage: '', message: '', error: '' } });
-        showToast('已关闭内嵌浏览器');
+        showToast('已退出登录，内嵌页面已关闭');
       }
 
       function loadSystemUrls(){
@@ -2631,6 +2646,7 @@
 
         document.getElementById('browser-login').addEventListener('click', browserLogin);
         document.getElementById('browser-export').addEventListener('click', browserExport);
+        document.getElementById('browser-hide').addEventListener('click', browserHide);
         document.getElementById('browser-logout').addEventListener('click', browserLogout);
         document.getElementById('browser-url').addEventListener('change', function(){
           browserState.current = this.value;

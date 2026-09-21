@@ -105,6 +105,7 @@ class EmbeddedBrowser(QObject):
         self._page: SchoolPage | None = None
         self._profile: QWebEngineProfile | None = None
         self._url_label: QLabel | None = None
+        self._status_label: QLabel | None = None
         self._find_tries = 0
 
         # 导出期间教务系统开的窗口：必须留引用，否则会被 GC 掉、下载随之丢失
@@ -140,6 +141,10 @@ class EmbeddedBrowser(QObject):
         self._export_timeout = QTimer(self)
         self._export_timeout.setSingleShot(True)
         self._export_timeout.timeout.connect(self._on_export_timeout)
+
+        # 内嵌页面会盖住整个应用界面，状态必须显示在它自己的工具条上，
+        # 否则用户看不到任何进度或错误——这正是「点了导出没反应」的观感来源。
+        self.status_changed.connect(self._refresh_status_label)
 
     # ------------------------------------------------------------------
     # 状态
@@ -223,6 +228,10 @@ class EmbeddedBrowser(QObject):
         url_label.setStyleSheet("color:#5f5f5f; padding:0 8px;")
         bar_layout.addWidget(url_label, 1)
 
+        status_label = QLabel("")
+        status_label.setStyleSheet("color:#5f5f5f; padding:0 8px;")
+        bar_layout.addWidget(status_label)
+
         export = QPushButton("导出课表 PDF")
         export.setFixedHeight(28)
         export.clicked.connect(lambda: self.export_schedule())
@@ -256,6 +265,8 @@ class EmbeddedBrowser(QObject):
         self._page = page
         self._profile = profile
         self._url_label = url_label
+        self._status_label = status_label
+        self._refresh_status_label()
         return True
 
     def eventFilter(self, obj, event):  # noqa: N802
@@ -268,6 +279,26 @@ class EmbeddedBrowser(QObject):
         if self._host is None or self._container is None:
             return
         self._container.setGeometry(0, 0, self._host.width(), self._host.height())
+
+    def _refresh_status_label(self) -> None:
+        """把当前状态显示到内嵌页面的工具条上。"""
+        if self._status_label is None:
+            return
+        status = self.status()
+        if status.get("error"):
+            text = "⚠ " + status["error"]
+            color = "#c42b1c"
+        elif status.get("busy"):
+            text = status.get("stage") or "处理中…"
+            if status.get("message"):
+                text += " · " + status["message"]
+            color = "#0a5aa8"
+        else:
+            text = status.get("message") or ""
+            color = "#107c10" if status.get("logged_in") else "#5f5f5f"
+        self._status_label.setText(text)
+        self._status_label.setStyleSheet(f"color:{color}; padding:0 8px;")
+        self._status_label.setToolTip(text)
 
     # ------------------------------------------------------------------
     # 显示 / 隐藏

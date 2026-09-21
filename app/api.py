@@ -17,7 +17,7 @@ from .people_store import (
     save_groups,
     save_people,
 )
-from .qtbridge import QtBridge, last_error
+from .qtbridge import QtBridge, clear_last_error, last_error
 from .system_urls import DEFAULT_LOGIN_URL, SYSTEM_URLS
 
 
@@ -39,6 +39,10 @@ class Api:
         self.people, self.parser_version = load_data(self.data_path)
         self.groups = load_groups(self.groups_path)
         self._lock = threading.Lock()
+        # 人员数据的读写锁。为什么必须有：批量导入跑在后台线程，而
+        # 「导出课表 → 自动入库」走 js_api 子线程，两者可能同时 _merge 并写同一个
+        # people.json —— 并发写会让 JSON 文件损坏。所有人员变更都必须走这个锁。
+        self._people_lock = threading.RLock()
         self._import = self._idle_import_state()
         # 账号模块（来自原「教务系统管理器」）；db 路径可注入，便于测试
         self.accounts = AccountService(accounts_db_path)
@@ -75,7 +79,8 @@ class Api:
         }
 
     def get_people(self) -> list:
-        return [person.to_dict() for person in self.people]
+        with self._people_lock:
+            return [person.to_dict() for person in self.people]
 
     def get_app_info(self) -> dict:
         info = app_info()
@@ -117,13 +122,15 @@ class Api:
             fresh.group = person.group
             fresh.source = source
             fresh.parsed_with = PARSER_VERSION
-            self.people[index] = fresh
+            with self._people_lock:
+                self.people[index] = fresh
             refreshed += 1
 
         self.parser_version = max(
             [person.parsed_with or 0 for person in self.people] or [0]
         )
-        save_people(self.people, self.data_path)
+        with self._people_lock:
+            self._save_people()
         return {
             "people": self.get_people(),
             "groups": self.get_groups(),
@@ -332,9 +339,7 @@ class Api:
             except Exception as exc:  # noqa: BLE001
                 errors.append({"path": path, "error": str(exc)})
             else:
-                existed = any(self._same_person(p, person) for p in self.people)
-                self._merge(person)
-                if existed:
+                if self._merge_and_save(person):
                     updated += 1
                 else:
                     added += 1
@@ -345,9 +350,11 @@ class Api:
                 self._import["errors"] = list(errors)
             if index % 25 == 0:
                 # 人数多时中途落盘，避免程序意外关闭导致整批导入丢失
-                save_people(self.people, self.data_path)
+                with self._people_lock:
+                    self._save_people()
 
-        save_people(self.people, self.data_path)
+        with self._people_lock:
+            self._save_people()
         if group and not self._has_group(group):
             self.groups.append({"name": group, "parent": ""})
             save_groups(self.groups, self.groups_path)
@@ -379,17 +386,18 @@ class Api:
 
     def set_groups(self, assignments: list) -> dict:
         """批量设置分组。assignments 为 [{index, group}, ...]。"""
-        for item in assignments or []:
-            try:
-                index = int(item.get("index"))
-            except (TypeError, ValueError):
-                continue
-            if 0 <= index < len(self.people):
-                group = (item.get("group") or "").strip()
-                self.people[index].group = group
-                if group and not self._has_group(group):
-                    self.groups.append({"name": group, "parent": ""})
-        save_people(self.people, self.data_path)
+        with self._people_lock:
+            for item in assignments or []:
+                try:
+                    index = int(item.get("index"))
+                except (TypeError, ValueError):
+                    continue
+                if 0 <= index < len(self.people):
+                    group = (item.get("group") or "").strip()
+                    self.people[index].group = group
+                    if group and not self._has_group(group):
+                        self.groups.append({"name": group, "parent": ""})
+            self._save_people()
         save_groups(self.groups, self.groups_path)
         return {"groups": self.get_groups(), "people": self.get_people()}
 
@@ -402,8 +410,9 @@ class Api:
             except (TypeError, ValueError):
                 continue
         if targets:
-            self.people = [p for i, p in enumerate(self.people) if i not in targets]
-            save_people(self.people, self.data_path)
+            with self._people_lock:
+                self.people = [p for i, p in enumerate(self.people) if i not in targets]
+                self._save_people()
         return {"groups": self.get_groups(), "people": self.get_people()}
 
     @staticmethod
@@ -424,6 +433,23 @@ class Api:
                 self.people[index] = person
                 return
         self.people.append(person)
+
+    def _save_people(self) -> None:
+        """落盘人员列表（需在 _people_lock 保护下调用）。"""
+        save_people(self.people, self.data_path)
+
+    def _merge_and_save(self, person) -> bool:
+        """把 person 合并进人员列表并立即落盘，返回是否为「更新已有的人」。
+
+        读-改-写整段都在 _people_lock 内完成：批量导入跑在后台线程，
+        浏览器自动入库跑在 js_api 子线程，两者交叉会导致漏更新或
+        people.json 被写坏。
+        """
+        with self._people_lock:
+            existed = any(self._same_person(p, person) for p in self.people)
+            self._merge(person)
+            self._save_people()
+        return existed
 
     @staticmethod
     def _ask_pdf_files() -> list:
@@ -516,6 +542,16 @@ class Api:
 
     # ============ 课表导出（内嵌浏览器 + 导出后自动入库） ============
 
+    def _begin_browser_action(self) -> bool:
+        """每个浏览器动作开始前调用。
+
+        清除上一次的主线程异常：get_browser_status 会把 qtbridge 记录的异常当作
+        browser.error 上报，如果不清，一次偶发异常会让界面**永久**显示「出错」。
+        由用户的下一个动作来重置，语义上正好。
+        """
+        clear_last_error()
+        return self._bridge is not None and self._browser is not None
+
     def _import_pdf_path(self, path: str, group: str = "") -> dict:
         """解析一个课表 PDF 并合并进人员列表。
 
@@ -526,9 +562,7 @@ class Api:
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "path": path, "error": str(exc)}
 
-        existed = any(self._same_person(p, person) for p in self.people)
-        self._merge(person)
-        save_people(self.people, self.data_path)
+        existed = self._merge_and_save(person)
         if person.group and not self._has_group(person.group):
             self.groups.append({"name": person.group, "parent": ""})
             save_groups(self.groups, self.groups_path)
@@ -591,6 +625,8 @@ class Api:
             }
         )
         if self._browser is not None:
+            # 主线程里抛出的异常（Qt 事件循环内的）只在 qtbridge 里留了记录，
+            # 由下一次用户动作清除，见 _begin_browser_action。
             error = last_error()
             if error:
                 status["error"] = error.strip().splitlines()[-1]
@@ -604,7 +640,7 @@ class Api:
         return payload
 
     def browser_login(self, account_id) -> dict:
-        if self._bridge is None or self._browser is None:
+        if not self._begin_browser_action():
             return {"ok": False, "error": "浏览器还没准备好，请稍后重试"}
         try:
             account_id = int(account_id)
@@ -628,14 +664,14 @@ class Api:
         return {"ok": True, "account": nickname}
 
     def browser_export(self) -> dict:
-        if self._bridge is None or self._browser is None:
+        if not self._begin_browser_action():
             return {"ok": False, "error": "浏览器还没准备好，请稍后重试"}
         url = self.accounts.get_login_url(DEFAULT_LOGIN_URL)
         self._bridge.run(lambda: self._browser.export_schedule(url))
         return {"ok": True}
 
     def browser_open(self) -> dict:
-        if self._bridge is None or self._browser is None:
+        if not self._begin_browser_action():
             return {"ok": False, "error": "浏览器还没准备好，请稍后重试"}
         url = self.accounts.get_login_url(DEFAULT_LOGIN_URL)
         self._bridge.run(lambda: self._browser.open_page(url))

@@ -5,9 +5,11 @@
 不涉及 Qt 与网络。
 """
 
+import json
 import os
 import sys
 import tempfile
+import threading
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -143,6 +145,90 @@ class BrowserStatusTest(unittest.TestCase):
 
     def test_close_without_qt_is_safe(self):
         self.assertTrue(self.api.browser_close()["ok"])
+
+
+class ConcurrentImportTest(unittest.TestCase):
+    """并发写入不能损坏 people.json。
+
+    后台批量导入跑在独立线程，而「导出课表 → 自动入库」走 js_api 子线程，
+    两者可能同时 _merge 并写同一个 people.json。加锁前存在写坏文件、
+    或磁盘与内存数量不一致的风险。
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        root = self._tmp.name
+        self.api = Api(
+            data_path=os.path.join(root, "people.json"),
+            groups_path=os.path.join(root, "groups.json"),
+            accounts_db_path=os.path.join(root, "accounts.db"),
+        )
+
+    def tearDown(self):
+        self.api.accounts.close()
+        self._tmp.cleanup()
+
+    def test_concurrent_imports_keep_file_consistent(self):
+        errors = []
+
+        def worker(path):
+            try:
+                for _ in range(6):
+                    self.api.import_schedule_pdf(path)
+            except Exception as exc:  # noqa: BLE001
+                errors.append(repr(exc))
+
+        threads = [
+            threading.Thread(target=worker, args=(path,))
+            for path in (GRID, LIST, SPAN, MULTI)
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        self.assertEqual(errors, [], "并发导入不应抛异常")
+
+        # 文件必须是合法 JSON，且与内存中的结果一致
+        with open(self.api.data_path, encoding="utf-8") as handle:
+            on_disk = json.load(handle)
+        self.assertIsInstance(on_disk.get("people"), list)
+        self.assertGreater(len(on_disk["people"]), 0)
+
+        in_memory = self.api.get_people()
+        self.assertEqual(
+            len(on_disk["people"]),
+            len(in_memory),
+            "磁盘与内存中的人员数量必须一致（否则说明有写入被覆盖）",
+        )
+
+    def test_memory_and_disk_agree_after_concurrent_writes(self):
+        def worker(path):
+            self.api.import_schedule_pdf(path)
+
+        threads = [
+            threading.Thread(target=worker, args=(path,))
+            for path in (GRID, LIST)
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        # 重新从一个全新的 Api 实例读，模拟「下次启动」看到的数据
+        fresh = Api(
+            data_path=self.api.data_path,
+            groups_path=self.api.groups_path,
+            accounts_db_path=os.path.join(self._tmp.name, "accounts2.db"),
+        )
+        try:
+            self.assertEqual(
+                len(fresh.get_people()),
+                len(self.api.get_people()),
+                "重新加载后人员数量应与内存一致",
+            )
+        finally:
+            fresh.accounts.close()
 
 
 if __name__ == "__main__":

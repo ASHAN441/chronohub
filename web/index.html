@@ -114,7 +114,10 @@
 
     .win-statusbar{ display:flex; align-items:center; gap:16px; height:26px; padding:0 10px; flex:none; background:var(--win-surface); border-top:1px solid var(--win-border); font-size:11px; color:var(--win-text-muted); }
     .win-statusbar strong{ color:var(--win-text); font-weight:600; }
- .win-toast{ position:absolute; left:50%; bottom:44px; transform:translateX(-50%); padding:8px 14px; border-radius:6px; background:var(--win-surface); border:1px solid var(--win-border); box-shadow:0 4px 14px rgba(0,0,0,.18); font-size:13px; color:var(--win-text); z-index:10; }
+ .win-toast{ position:absolute; left:50%; bottom:44px; transform:translateX(-50%); padding:8px 14px; border-radius:6px; background:var(--win-surface); border:1px solid var(--win-border); box-shadow:0 4px 14px rgba(0,0,0,.18); font-size:13px; color:var(--win-text); z-index:10; display:flex; align-items:center; gap:10px; }
+ .win-toast[hidden]{ display:none; }
+ .win-toast button{ font-family:inherit; font-size:12px; padding:3px 9px; border-radius:5px; border:1px solid var(--win-border); background:var(--win-surface-2); color:var(--win-text); cursor:pointer; white-space:nowrap; }
+ .win-toast button:hover{ background:var(--win-surface-3); }
  .win-progress{ position:absolute; left:50%; bottom:44px; transform:translateX(-50%); width:420px; max-width:80%; padding:10px 14px; border-radius:6px; background:var(--win-surface); border:1px solid var(--win-border); box-shadow:0 4px 14px rgba(0,0,0,.18); z-index:12; }
  .win-progress-head{ display:flex; justify-content:space-between; font-size:13px; color:var(--win-text); margin-bottom:6px; }
  .win-progress-track{ height:8px; border-radius:4px; background:rgba(127,127,127,.22); overflow:hidden; }
@@ -945,9 +948,14 @@
             bestSlots.push(DAYS[d-1]+' 第'+p+'节');
           }
         }
-        var shown = bestSlots.slice(0,3).join('、');
-        if(bestSlots.length>3) shown += ' 等';
-        document.getElementById('status-summary').innerHTML = '空闲人数最多 <strong>'+bestCount+'</strong> 人（'+shown+'）';
+        if(bestCount > 0){
+          var shown = bestSlots.slice(0,3).join('、');
+          if(bestSlots.length>3) shown += ' 等';
+          document.getElementById('status-summary').innerHTML = '空闲人数最多 <strong>'+bestCount+'</strong> 人（'+shown+'）';
+        } else {
+          // 每个时段都有人有课：不能输出「空闲人数最多 0 人（）」
+          document.getElementById('status-summary').textContent = '当前条件下没有空闲时段';
+        }
         document.getElementById('status-week').textContent = weekLabel+' · 已选 '+sel.length+' 人';
       }
 
@@ -1540,36 +1548,64 @@
         afterDataChange();   // 合并后新增：同步导航角标与账号页的课表入库状态
       }
 
-      function showToast(message){
+      // 第三个参数可选：给了就渲染一个动作按钮（例如「去看空课表」）。
+      // 之前调用方传了 3 个参数但这里只收 1 个，多余参数被静默丢弃，
+      // 那几处引导实际是死代码。
+      function showToast(message, actionLabel, actionFn){
         var toast = document.getElementById('toast');
-        toast.textContent = message;
+        toast.innerHTML = '';
+        var span = document.createElement('span');
+        span.textContent = message;
+        toast.appendChild(span);
+
+        var hold = 3200;
+        if(actionLabel){
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = actionLabel;
+          btn.addEventListener('click', function(){
+            toast.hidden = true;
+            if(actionFn) actionFn();
+          });
+          toast.appendChild(btn);
+          hold = 7000;
+        }
         toast.hidden = false;
         clearTimeout(showToast.timer);
-        showToast.timer = setTimeout(function(){ toast.hidden = true; }, 3200);
+        showToast.timer = setTimeout(function(){ toast.hidden = true; }, hold);
       }
 
       function isDesktop(){
         return !!(window.pywebview && window.pywebview.api && typeof window.pywebview.api.get_people === 'function');
       }
 
-      function waitForPywebview(){
+      // 轮询等待 js_api 桥就绪，返回 Promise<boolean>。
+      //
+      // 不能用「事件 + 固定超时」：QtWebEngine 初始化慢时桥会晚于超时到达，
+      // 一旦超时就永久退化到兜底示例数据（FALLBACK_*），而删除账号、设置分组
+      // 这些操作仍会打到真实后端，等于拿示例数据的 id / 下标去改真数据。
+      // 改成轮询，桥什么时候到就什么时候补上。
+      function waitForPywebview(timeoutMs){
+        var limit = timeoutMs || 30000;
         return new Promise(function(resolve){
-          function apiReady(){
-            return !!(window.pywebview && window.pywebview.api && typeof window.pywebview.api.get_people === 'function');
-          }
-          if(apiReady()){
-            resolve();
-            return;
-          }
-          var done = false;
-          function finish(){
-            if(done) return;
-            done = true;
-            window.removeEventListener('pywebviewready', finish);
-            resolve();
-          }
-          window.addEventListener('pywebviewready', finish);
-          setTimeout(finish, 3000);
+          if(isDesktop()){ resolve(true); return; }
+          var deadline = Date.now() + limit;
+          var timer = setInterval(function(){
+            if(isDesktop()){
+              clearInterval(timer);
+              resolve(true);
+            } else if(Date.now() >= deadline){
+              clearInterval(timer);
+              resolve(false);
+            }
+          }, 100);
+          window.addEventListener('pywebviewready', function once(){
+            window.removeEventListener('pywebviewready', once);
+            if(isDesktop()){
+              clearInterval(timer);
+              resolve(true);
+            }
+          });
         });
       }
 
@@ -1764,6 +1800,10 @@
 
       async function startImportFromModal(kind){
         var group = document.getElementById('import-group-input').value.trim();
+        // 「未分组」是界面上的虚拟分组，后端用空字符串表示。必须归一化，
+        // 否则会真的建出一个名叫「未分组」的分组，而那些人在「未分组」筛选下
+        // 又因为判据是 !p.group 而全部看不见（与拖拽/批量分组行为也不一致）。
+        if(group === '未分组') group = '';
         closeImportModal();
         await runImport(kind, group);
       }
@@ -2433,8 +2473,15 @@
       /* =========================================================
          合并后新增 —— 课表导出页
          ========================================================= */
-      var browserState = { urls: [], current: '', loggedName: '', last: null };
+      var browserState = { urls: [], current: '', loggedName: '', last: null, actionUntil: 0 };
       var browserPoll = null;
+
+      // 动作刚发出时后端还没真正开始执行（js_api 只是把任务排进 Qt 主线程队列），
+      // 这一小段时间里读到的状态还是「空闲」，会把轮询直接掐断、
+      // 连带丢掉后续的自动入库。所以动作发出后给一个宽限窗口。
+      function markBrowserActivity(){
+        browserState.actionUntil = Date.now() + 20000;
+      }
 
       var DEFAULT_BROWSER_HINT =
         '点「打开并登录」，教务系统页面会直接显示在这个窗口里（内嵌 Chromium），并自动填入账号密码。' +
@@ -2455,8 +2502,11 @@
         window.pywebview.api.get_browser_status().then(function(payload){
           applyBrowserStatus(payload);
           var st = (payload && payload.browser) || {};
-          // 浏览器已关闭且没有正在进行的任务，就停止轮询，别一直空转
-          if(!st.open && !st.busy) stopBrowserPoll();
+          // 空闲、并且已经过了动作宽限窗口，才停轮询。
+          // 判据不能只看当前快照：单次过期快照就停会导致自动入库没人消费。
+          if(!st.open && !st.busy && Date.now() > browserState.actionUntil){
+            stopBrowserPoll();
+          }
         }).catch(function(){});
       }
 
@@ -2513,7 +2563,10 @@
         var r = payload.imported || {};
         if(payload.people) state.people = payload.people;
         if(payload.groups) state.groups = payload.groups;
-        renderAll();      // 空课表视图随之刷新
+        // 必须走 reloadFromState：它会重置选中项（选满当前可见的人）。
+        // 只调 renderAll 的话，新入库的人下标不在 state.selected 里，
+        // 空课表网格不会把他算进去，看起来就像「入库了但没生效」。
+        reloadFromState();
         loadAccounts();   // 账号页的「课表已入库」标签随之刷新
 
         if(r.ok){
@@ -2542,6 +2595,7 @@
         window.pywebview.api.browser_login(a.id).then(function(res){
           if(res && res.ok === false){ showToast('登录失败：' + (res.error || '未知错误')); return; }
           showToast('正在打开浏览器并登录「' + a.nickname + '」…');
+          markBrowserActivity();
           ensureBrowserPoll();
           pollBrowserStatus();
         }).catch(function(e){ showToast('登录失败：' + (e && e.message ? e.message : e)); });
@@ -2555,6 +2609,7 @@
         window.pywebview.api.browser_export().then(function(res){
           if(res && res.ok === false){ showToast('导出失败：' + (res.error || '未知错误')); return; }
           showToast('已开始导出课表 PDF…');
+          markBrowserActivity();
           ensureBrowserPoll();
           pollBrowserStatus();
         }).catch(function(e){ showToast('导出失败：' + (e && e.message ? e.message : e)); });
@@ -2562,13 +2617,19 @@
 
       function browserHide(){
         if(isDesktop()) window.pywebview.api.browser_hide().catch(function(){});
-        stopBrowserPoll();
+        markBrowserActivity();
+        // 不要在这里 stopBrowserPoll()：用户很可能是在导出/下载进行中点「返回应用」，
+        // 停掉轮询就没人消费待入库的 PDF 了。保留后端仍在进行的状态，让
+        // pollBrowserStatus 自己判断何时该停。
         var last = browserState.last || {};
         applyBrowserStatus({ browser: {
           open: false,
           logged_in: !!last.logged_in,
           account: last.account || '',
-          busy: false, stage: '', message: '', error: ''
+          busy: !!last.busy,
+          stage: last.stage || '',
+          message: last.message || '',
+          error: last.error || ''
         } });
         showToast('已返回应用，登录状态保留');
       }

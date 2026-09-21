@@ -1,9 +1,13 @@
 # SYNUTV 运行依赖
 #
-# 说明：合并前两个项目分别依赖 PySide6（教务）与 pywebview（空课表）。
+# pywebview 需要收紧版本区间：内嵌教务系统页面依赖它的内部结构
+# （Qt 后端的窗口是 QMainWindow、webview 是其 centralWidget），大版本升级
+# 可能破坏这一点。已在 6.2.1 上验证通过。
+#
+# 合并前两个项目分别依赖 PySide6（教务）与 pywebview（空课表）；
 # 合并后 pywebview 走 Qt 后端，因此额外需要 qtpy 作为桥接层。
 
-pywebview>=5.0
+pywebview>=6.2,<7
 PySide6
 qtpy
 pdfplumber>=0.11

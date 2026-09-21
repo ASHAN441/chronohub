@@ -1,0 +1,9 @@
+# SYNUTV 运行依赖
+#
+# 说明：合并前两个项目分别依赖 PySide6（教务）与 pywebview（空课表）。
+# 合并后 pywebview 走 Qt 后端，因此额外需要 qtpy 作为桥接层。
+
+pywebview>=5.0
+PySide6
+qtpy
+pdfplumber>=0.11

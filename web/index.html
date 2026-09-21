@@ -1,0 +1,1929 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>多人空课表</title>
+  <style>
+    :root{ color-scheme: light dark; }
+    html, body{ margin:0; height:100%; }
+    body{
+      --win-bg: light-dark(#f3f3f3, #202020);
+      --win-surface: light-dark(#ffffff, #2b2b2b);
+      --win-surface-2: light-dark(#f9f9f9, #323232);
+      --win-surface-3: light-dark(#ebebeb, #3a3a3a);
+      --win-text: light-dark(#1b1b1b, #f0f0f0);
+      --win-text-muted: light-dark(#5f5f5f, #b0b0b0);
+      --win-border: light-dark(#d9d9d9, #3a3a3a);
+      --win-accent: light-dark(#0078d4, #4cc2ff);
+      --win-accent-fg: light-dark(#ffffff, #0b1b2b);
+      --win-accent-soft: color-mix(in srgb, var(--win-accent) 13%, var(--win-surface));
+      --win-free: light-dark(#107c10, #6ccb5f);
+      --cell-pad: 5px 8px;
+      font-family: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+      color: var(--win-text);
+      background: var(--win-bg);
+      font-size: 13px;
+      line-height: 1.45;
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
+    }
+    *, *::before, *::after{ box-sizing:border-box; }
+
+    .win-titlebar{ display:flex; align-items:stretch; height:36px; flex:none; background:var(--win-surface); border-bottom:1px solid var(--win-border); user-select:none; }
+    .win-titlebar-left{ display:flex; align-items:center; gap:9px; padding-left:12px; min-width:0; }
+    .win-logo{ width:18px; height:18px; border-radius:4px; background:var(--win-accent); color:var(--win-accent-fg); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; }
+    .win-title{ font-size:12px; color:var(--win-text-muted); white-space:nowrap; }
+    .win-controls{ margin-left:auto; display:flex; flex:none; }
+    .win-controls button{ width:46px; height:36px; border:none; background:transparent; color:var(--win-text); font-family:inherit; font-size:12px; display:flex; align-items:center; justify-content:center; cursor:default; }
+    .win-controls button:hover{ background:var(--win-surface-3); }
+    .win-controls .win-close:hover{ background:#e81123; color:#fff; }
+
+    .win-toolbar{ display:flex; align-items:center; gap:8px; padding:8px 12px; flex:none; background:var(--win-surface); border-bottom:1px solid var(--win-border); flex-wrap:wrap; }
+    .tb-btn{ display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 11px; border:1px solid transparent; border-radius:5px; background:transparent; color:var(--win-text); font-family:inherit; font-size:13px; cursor:pointer; }
+    .tb-btn:hover{ background:var(--win-surface-3); }
+    .tb-btn.primary{ background:var(--win-accent); color:var(--win-accent-fg); }
+    .tb-btn.primary:hover{ background:color-mix(in srgb, var(--win-accent) 88%, #000); }
+    .tb-sep{ width:1px; height:20px; background:var(--win-border); margin:0 2px; }
+    .tb-field{ display:inline-flex; align-items:center; gap:7px; color:var(--win-text-muted); font-size:12px; }
+    .tb-select{ font-family:inherit; font-size:13px; height:30px; padding:0 8px; border-radius:5px; border:1px solid var(--win-border); background:var(--win-surface); color:var(--win-text); }
+    .tb-spacer{ flex:1; }
+    .tb-info{ font-size:12px; color:var(--win-text-muted); }
+    .tb-info strong{ color:var(--win-text); font-weight:600; }
+
+    .win-body{ display:flex; align-items:stretch; flex:1; min-height:0; }
+    .win-sidebar{ width:224px; flex:none; border-right:1px solid var(--win-border); background:var(--win-surface); padding:12px 10px; overflow-y:auto; }
+    .win-sidebar-title{ font-size:12px; font-weight:600; padding:0 6px; }
+    .win-sidebar-sub{ font-size:11px; color:var(--win-text-muted); padding:2px 6px 10px; }
+    .win-people-list{ display:flex; flex-direction:column; gap:2px; }
+    .person-item{ display:flex; align-items:center; gap:8px; padding:6px; border-radius:5px; cursor:pointer; }
+    .person-item:hover{ background:var(--win-surface-3); }
+    .person-item.is-off{ opacity:.48; }
+    .person-check{ accent-color:var(--win-accent); }
+    .person-avatar{ width:24px; height:24px; border-radius:50%; background:var(--win-accent-soft); color:var(--win-accent); display:flex; align-items:center; justify-content:center; font-size:12px; flex:none; }
+    .person-info{ display:flex; flex-direction:column; min-width:0; }
+    .person-name{ font-size:13px; }
+    .person-major{ font-size:11px; color:var(--win-text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+    .win-main{ flex:1; min-width:0; padding:12px; display:flex; flex-direction:column; }
+    .win-grid-wrap{ flex:1; min-height:0; overflow:auto; border:1px solid var(--win-border); border-radius:6px; background:var(--win-border); }
+    .win-grid{ width:100%; border-collapse:separate; border-spacing:1px; min-width:760px; table-layout:fixed; }
+    .win-grid th, .win-grid td{ background:var(--win-surface); }
+    .win-grid th{ padding:7px; font-size:12px; font-weight:600; color:var(--win-text-muted); text-align:center; }
+    .win-grid .group-row td{ padding:3px 10px; font-size:11px; color:var(--win-text-muted); background:var(--win-surface-3); text-align:left; }
+    .win-grid .period-cell{ text-align:center; font-size:12px; color:var(--win-text-muted); width:50px; }
+    .win-grid .slot{ padding:var(--cell-pad); font-size:12px; vertical-align:middle; text-align:center; min-width:92px; cursor:pointer; }
+    .win-grid .slot:hover{ outline:1px solid var(--win-accent); outline-offset:-1px; }
+    .win-grid .slot.none{ background:var(--win-surface-2); color:var(--win-text-muted); }
+    .win-grid .slot.some{ background:color-mix(in srgb, var(--win-free) var(--mix,40%), var(--win-surface)); }
+    .win-grid .slot.full{ background:color-mix(in srgb, var(--win-free) var(--mix,100%), var(--win-surface)); }
+    .win-grid .slot .cell-big{ font-size:15px; font-weight:600; line-height:1.25; }
+    .win-grid .slot .cell-sub{ font-size:11px; color:var(--win-text-muted); }
+    .roster-list{ max-height:320px; overflow-y:auto; border:1px solid var(--win-border); border-radius:6px; }
+    .roster-item{ display:flex; align-items:center; gap:8px; padding:6px 10px; border-bottom:1px solid var(--win-border); font-size:13px; }
+    .roster-item:last-child{ border-bottom:none; }
+    .roster-name{ min-width:70px; }
+    .roster-meta{ color:var(--win-text-muted); font-size:12px; }
+    .roster-group{ margin-left:auto; color:var(--win-text-muted); font-size:12px; }
+    .person-del{ width:20px; height:20px; display:flex; align-items:center; justify-content:center; border:1px solid var(--win-border); background:var(--win-surface-2); color:var(--win-text-muted); cursor:pointer; font-size:13px; padding:0; border-radius:5px; margin-left:auto; }
+    .person-del:hover{ color:#e81123; background:color-mix(in srgb, #e81123 12%, var(--win-surface)); border-color:color-mix(in srgb, #e81123 45%, var(--win-border)); }
+    .person-open{ cursor:pointer; }
+    .person-open:hover{ text-decoration:underline; color:var(--win-accent); }
+    .win-modal-card.wider{ width:780px; max-width:94vw; }
+    .person-grid-wrap{ overflow:auto; max-height:420px; border:1px solid var(--win-border); border-radius:6px; }
+    .person-grid{ width:100%; border-collapse:separate; border-spacing:1px; background:var(--win-border); min-width:680px; }
+    .person-grid th, .person-grid td{ background:var(--win-surface); padding:5px 6px; font-size:12px; vertical-align:top; text-align:left; }
+    .person-grid th{ color:var(--win-text-muted); font-weight:500; text-align:center; background:var(--win-surface-2); }
+    .person-grid .pg-group td{ background:var(--win-surface-2); color:var(--win-text-muted); font-size:11px; padding:3px 8px; }
+    .person-grid .pg-period{ text-align:center; color:var(--win-text-muted); width:54px; }
+    .person-grid .pc-course + .pc-course{ margin-top:6px; padding-top:6px; border-top:1px dashed var(--win-border); }
+    .person-grid .pc-name{ font-weight:500; line-height:1.3; }
+    .person-grid .pc-meta{ color:var(--win-text-muted); font-size:11px; line-height:1.4; }
+    .win-grid .grid-empty{ height:320px; text-align:center; vertical-align:middle; padding:20px; }
+    .win-grid .grid-empty-title{ font-size:15px; font-weight:500; margin-bottom:6px; }
+    .win-grid .grid-empty-sub{ color:var(--win-text-muted); margin-bottom:14px; }
+
+    .win-legend{ display:flex; align-items:center; gap:14px; margin-top:9px; font-size:12px; color:var(--win-text-muted); flex-wrap:wrap; flex:none; }
+    .win-legend-item{ display:inline-flex; align-items:center; gap:6px; }
+    .win-legend-dot{ width:10px; height:10px; border-radius:2px; }
+    .win-legend-dot.none{ background:var(--win-surface-2); border:1px solid var(--win-border); }
+    .win-legend-dot.some{ background:color-mix(in srgb, var(--win-free) 32%, var(--win-surface)); border:1px solid var(--win-free); }
+    .win-legend-dot.full{ background:color-mix(in srgb, var(--win-free) 24%, var(--win-surface)); border:1px solid var(--win-free); }
+    .win-legend-note{ margin-left:auto; }
+
+    .win-statusbar{ display:flex; align-items:center; gap:16px; height:26px; padding:0 10px; flex:none; background:var(--win-surface); border-top:1px solid var(--win-border); font-size:11px; color:var(--win-text-muted); }
+    .win-statusbar strong{ color:var(--win-text); font-weight:600; }
+ .win-toast{ position:absolute; left:50%; bottom:44px; transform:translateX(-50%); padding:8px 14px; border-radius:6px; background:var(--win-surface); border:1px solid var(--win-border); box-shadow:0 4px 14px rgba(0,0,0,.18); font-size:13px; color:var(--win-text); z-index:10; }
+ .win-progress{ position:absolute; left:50%; bottom:44px; transform:translateX(-50%); width:420px; max-width:80%; padding:10px 14px; border-radius:6px; background:var(--win-surface); border:1px solid var(--win-border); box-shadow:0 4px 14px rgba(0,0,0,.18); z-index:12; }
+ .win-progress-head{ display:flex; justify-content:space-between; font-size:13px; color:var(--win-text); margin-bottom:6px; }
+ .win-progress-track{ height:8px; border-radius:4px; background:rgba(127,127,127,.22); overflow:hidden; }
+ .win-progress-fill{ height:100%; width:0; background:var(--win-accent); transition:width .2s ease; }
+ .win-progress-note{ margin-top:6px; font-size:12px; color:var(--win-text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .win-version{ font-size:11px; color:var(--win-text-muted); background:var(--win-surface-3); padding:1px 7px; border-radius:999px; }
+    .win-modal{ position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center; }
+    .win-modal[hidden]{ display:none; }
+    .win-modal-backdrop{ position:absolute; inset:0; background:rgba(0,0,0,.4); }
+    .win-modal-card{ position:relative; width:320px; max-width:90vw; background:var(--win-surface); border:1px solid var(--win-border); border-radius:10px; box-shadow:0 12px 32px rgba(0,0,0,.3); overflow:hidden; }
+    .win-modal-head{ display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--win-border); font-weight:500; }
+    .win-modal-close{ border:none; background:transparent; color:var(--win-text-muted); cursor:pointer; font-size:14px; padding:2px 7px; border-radius:4px; }
+    .win-modal-close:hover{ color:var(--win-text); background:var(--win-surface-3); }
+    .win-modal-body{ padding:22px 18px 20px; text-align:center; display:flex; flex-direction:column; gap:6px; align-items:center; }
+    .about-logo{ width:52px; height:52px; border-radius:12px; background:var(--win-accent); color:var(--win-accent-fg); display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:600; margin-bottom:6px; }
+    .about-name{ font-size:16px; font-weight:600; }
+    .about-version{ font-size:13px; color:var(--win-text-muted); }
+    .about-dev{ font-size:13px; margin-top:8px; }
+    .about-contact{ font-size:12px; color:var(--win-text-muted); }
+    .about-copyright{ font-size:12px; color:var(--win-text-muted); margin-top:8px; }
+    .win-sidebar-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 6px; }
+    .win-sidebar-head .tb-btn{ height:24px; padding:0 8px; font-size:12px; }
+    .group-header{ font-size:11px; font-weight:600; color:var(--win-text-muted); padding:9px 6px 4px; }
+    .win-input{ font-family:inherit; font-size:13px; height:32px; padding:0 10px; border-radius:5px; border:1px solid var(--win-border); background:var(--win-surface); color:var(--win-text); width:100%; }
+    .win-field-label{ font-size:12px; color:var(--win-text-muted); }
+    .group-modal-body{ padding:14px; display:flex; flex-direction:column; gap:10px; }
+    .group-modal-actions{ display:flex; justify-content:flex-end; gap:8px; }
+    .win-modal-card.wide{ width:460px; }
+    .group-list{ max-height:300px; overflow-y:auto; border:1px solid var(--win-border); border-radius:6px; }
+    .group-person{ display:flex; align-items:center; gap:8px; padding:6px 10px; border-bottom:1px solid var(--win-border); font-size:13px; cursor:pointer; }
+    .group-person:last-child{ border-bottom:none; }
+    .group-person:hover{ background:var(--win-surface-3); }
+    .group-person .gp-name{ flex:1; }
+    .group-person .gp-group{ color:var(--win-text-muted); font-size:12px; }
+    .win-form-row{ display:flex; gap:8px; }
+    .win-form-row .win-input{ flex:1; width:auto; }
+    .win-sidebar-actions{ display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:0 6px 10px; }
+    .win-sidebar-actions .tb-btn{ height:30px; justify-content:center; padding:0 6px; font-size:12px; border:1px solid var(--win-border); border-radius:6px; background:var(--win-surface-2); color:var(--win-text); }
+    .win-sidebar-actions .tb-btn:hover{ background:var(--win-surface-3); border-color:color-mix(in srgb, var(--win-text) 22%, var(--win-border)); }
+    .win-sidebar-actions .tb-btn:active{ background:color-mix(in srgb, var(--win-accent) 14%, var(--win-surface)); border-color:var(--win-accent); }
+    .win-sidebar-actions .tb-btn.danger{ grid-column:1 / -1; color:light-dark(#c42b1c, #ff9aa2); }
+    .win-sidebar-actions .tb-btn.danger:hover{ background:color-mix(in srgb, light-dark(#c42b1c, #ff9aa2) 12%, var(--win-surface-2)); border-color:color-mix(in srgb, light-dark(#c42b1c, #ff9aa2) 45%, var(--win-border)); }
+    .win-sidebar-hint{ grid-column:1 / -1; text-align:center; font-size:12px; color:var(--win-text-muted); }
+    .win-sidebar-search{ display:flex; gap:6px; padding:0 6px 8px; }
+    .win-sidebar-search .win-input{ height:28px; font-size:12px; }
+    #people-search{ flex:1; min-width:0; }
+    #people-sort{ width:74px; flex:none; }
+    .group-block{ border-radius:6px; padding-bottom:2px; }
+    .group-block.over{ background:var(--win-accent-soft); outline:1px dashed var(--win-accent); }
+    .group-block .group-header{ display:flex; align-items:center; justify-content:space-between; gap:4px; cursor:grab; }
+    .group-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .group-tools{ display:flex; gap:3px; flex:none; align-items:center; }
+    .group-btn{ width:20px; height:20px; display:flex; align-items:center; justify-content:center; border:1px solid var(--win-border); background:var(--win-surface-2); color:var(--win-text-muted); cursor:pointer; border-radius:5px; font-size:11px; line-height:1; padding:0; }
+    .group-btn:hover{ color:var(--win-text); background:var(--win-surface-3); border-color:color-mix(in srgb, var(--win-text) 22%, var(--win-border)); }
+    .group-check{ accent-color:var(--win-accent); cursor:pointer; flex:none; margin:0; }
+    .group-move{ font-size:8px; }
+    .group-del{ font-size:13px; }
+    .group-del:hover{ color:#e81123; background:color-mix(in srgb, #e81123 12%, var(--win-surface)); border-color:color-mix(in srgb, #e81123 45%, var(--win-border)); }
+    .group-header.drop-target{ box-shadow:inset 0 2px 0 0 var(--win-accent); }
+    .group-header.dragging{ opacity:.5; }
+    .group-block.is-filtered{ background:var(--win-accent-soft); }
+    .group-name-edit{ cursor:pointer; }
+    .group-name-edit:hover{ text-decoration:underline; color:var(--win-accent); }
+    .person-item.out-of-scope{ opacity:.5; }
+    .group-empty{ font-size:11px; color:var(--win-text-muted); padding:4px 10px 8px; }
+    .person-item.dragging{ opacity:.45; }
+  </style>
+</head>
+<body>
+  <div class="win-titlebar">
+    <div class="win-titlebar-left">
+      <span class="win-logo">空</span>
+      <span class="win-title">多人空课表</span>
+      <span class="win-version" id="app-version"></span>
+    </div>
+    <div class="win-controls">
+      <button type="button" id="win-min" aria-label="最小化">─</button>
+      <button type="button" id="win-max" aria-label="最大化">□</button>
+      <button type="button" id="win-close" class="win-close" aria-label="关闭">✕</button>
+    </div>
+  </div>
+
+  <div class="win-toolbar">
+    <button class="tb-btn primary" id="import-btn" type="button">导入课表</button>
+    <button class="tb-btn" id="export-btn" type="button">导出</button>
+    <button class="tb-btn" id="about-btn" type="button">关于</button>
+    <span class="tb-sep"></span>
+    <label class="tb-field">学期
+      <select class="tb-select" id="semester-select"></select>
+    </label>
+    <label class="tb-field">分组
+      <select class="tb-select" id="group-select"></select>
+    </label>
+    <label class="tb-field">周次
+      <select class="tb-select" id="week-select"></select>
+    </label>
+    <span class="tb-spacer"></span>
+    <span class="tb-info" id="people-count"></span>
+  </div>
+
+  <div class="win-body">
+    <aside class="win-sidebar">
+      <div class="win-sidebar-title" style="padding:0 6px;">人员分组</div>
+      <div class="win-sidebar-sub">拖动调整分组 · 勾选后纳入统计</div>
+      <div class="win-sidebar-actions">
+        <button class="tb-btn" id="group-add-btn" type="button">＋ 新建分组</button>
+        <button class="tb-btn" id="group-btn" type="button">批量分组</button>
+      </div>
+      <div class="win-sidebar-actions">
+        <button class="tb-btn danger" id="people-remove-btn" type="button">删除勾选人员</button>
+        <span class="win-sidebar-hint" id="checked-count"></span>
+      </div>
+      <div class="win-sidebar-search">
+        <input class="win-input" id="people-search" placeholder="搜索姓名/学号">
+        <select class="win-input" id="people-sort" title="排序方式">
+          <option value="default">默认</option>
+          <option value="name">姓名</option>
+          <option value="id">学号</option>
+        </select>
+      </div>
+      <div class="win-people-list" id="people-list"></div>
+    </aside>
+
+    <main class="win-main">
+      <div class="win-grid-wrap" id="grid-wrap">
+        <table class="win-grid" id="grid">
+          <thead><tr><th class="period-cell">节次</th><th>周一</th><th>周二</th><th>周三</th><th>周四</th><th>周五</th><th>周六</th><th>周日</th></tr></thead>
+          <tbody id="grid-body"></tbody>
+        </table>
+      </div>
+      <div class="win-legend" id="legend">
+        <span class="win-legend-item"><span class="win-legend-dot none"></span>全员有课</span>
+        <span class="win-legend-item"><span class="win-legend-dot some"></span>部分人有空</span>
+        <span class="win-legend-item"><span class="win-legend-dot full"></span>全员有空</span>
+        <span class="win-legend-note">颜色越深，空闲人数越多</span>
+      </div>
+    </main>
+  </div>
+
+  <div class="win-statusbar">
+    <span id="status-summary"></span>
+    <span style="margin-left:auto" id="status-week"></span>
+  </div>
+
+  <div class="win-toast" id="toast" hidden></div>
+
+  <div class="win-progress" id="progress" hidden>
+    <div class="win-progress-head">
+      <span id="progress-title">正在识别课表…</span>
+      <span id="progress-count"></span>
+    </div>
+    <div class="win-progress-track"><div class="win-progress-fill" id="progress-fill"></div></div>
+    <div class="win-progress-note" id="progress-note"></div>
+  </div>
+
+  <div class="win-modal" id="about-modal" hidden>
+    <div class="win-modal-backdrop" id="about-backdrop"></div>
+    <div class="win-modal-card">
+      <div class="win-modal-head">
+        <span>关于</span>
+        <button class="win-modal-close" id="about-close" type="button" aria-label="关闭">✕</button>
+      </div>
+      <div class="win-modal-body">
+        <div class="about-logo">空</div>
+        <div class="about-name" id="about-name">多人空课表</div>
+        <div class="about-version" id="about-version">版本 v2.1</div>
+        <div class="about-dev" id="about-dev">开发者：阿山</div>
+        <div class="about-contact" id="about-contact">ashan441@163.com</div>
+        <div class="about-copyright" id="about-copyright">© 2026 阿山</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="win-modal" id="import-modal" hidden>
+    <div class="win-modal-backdrop" id="import-backdrop"></div>
+    <div class="win-modal-card">
+      <div class="win-modal-head">
+        <span>导入课表</span>
+        <button class="win-modal-close" id="import-close" type="button" aria-label="关闭">✕</button>
+      </div>
+      <div class="group-modal-body">
+        <div class="win-field-label">导入到哪个分组？（留空：新人员归入「未分组」，已有人员保留原分组）</div>
+        <input class="win-input" id="import-group-input" list="group-options" placeholder="例如：记者部">
+        <div class="win-field-label">选择文件：可一次多选；选择文件夹：会自动导入该文件夹（含子文件夹）里的所有 PDF。<br>人数较多时建议用文件夹导入，导入过程会显示进度。</div>
+        <div class="group-modal-actions">
+          <button class="tb-btn" id="import-cancel" type="button">取消</button>
+          <button class="tb-btn" id="import-confirm" type="button">选择文件并导入</button>
+          <button class="tb-btn primary" id="import-folder" type="button">选择文件夹并导入</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="win-modal" id="group-modal" hidden>
+    <div class="win-modal-backdrop" id="group-backdrop"></div>
+    <div class="win-modal-card wide">
+      <div class="win-modal-head">
+        <span>分组管理</span>
+        <button class="win-modal-close" id="group-close" type="button" aria-label="关闭">✕</button>
+      </div>
+      <div class="group-modal-body">
+        <div class="win-form-row">
+          <input class="win-input" id="group-search" placeholder="搜索姓名或学号">
+          <button class="tb-btn" id="group-select-all" type="button">全选</button>
+          <button class="tb-btn" id="group-select-none" type="button">取消全选</button>
+        </div>
+        <div class="win-field-label" id="group-picked-count"></div>
+        <div class="group-list" id="group-manage-list"></div>
+        <div class="win-form-row">
+          <select class="win-input" id="group-target"></select>
+          <button class="tb-btn primary" id="group-apply" type="button">应用到所选</button>
+          <button class="tb-btn" id="group-remove" type="button">删除所选</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="win-modal" id="confirm-modal" hidden>
+    <div class="win-modal-backdrop" id="confirm-backdrop"></div>
+    <div class="win-modal-card">
+      <div class="win-modal-head">
+        <span id="confirm-title">确认</span>
+        <button class="win-modal-close" id="confirm-close" type="button" aria-label="关闭">✕</button>
+      </div>
+      <div class="group-modal-body">
+        <div id="confirm-message"></div>
+        <div class="group-modal-actions">
+          <button class="tb-btn" id="confirm-cancel" type="button">取消</button>
+          <button class="tb-btn primary" id="confirm-ok" type="button">确定</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="win-modal" id="roster-modal" hidden>
+    <div class="win-modal-backdrop" id="roster-backdrop"></div>
+    <div class="win-modal-card wide">
+      <div class="win-modal-head">
+        <span id="roster-title">空闲名单</span>
+        <button class="win-modal-close" id="roster-close" type="button" aria-label="关闭">✕</button>
+      </div>
+      <div class="group-modal-body">
+        <div class="win-field-label" id="roster-sub"></div>
+        <div class="win-form-row">
+          <input class="win-input" id="roster-search" placeholder="搜索姓名或学号">
+          <button class="tb-btn" id="roster-copy" type="button">复制名单</button>
+        </div>
+        <div class="roster-list" id="roster-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="win-modal" id="person-modal" hidden>
+    <div class="win-modal-backdrop" id="person-backdrop"></div>
+    <div class="win-modal-card wider">
+      <div class="win-modal-head">
+        <span id="person-title">人员课表</span>
+        <button class="win-modal-close" id="person-close" type="button" aria-label="关闭">✕</button>
+      </div>
+      <div class="group-modal-body">
+        <div class="win-field-label" id="person-sub"></div>
+        <div class="person-grid-wrap" id="person-courses"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="win-modal" id="newgroup-modal" hidden>
+    <div class="win-modal-backdrop" id="newgroup-backdrop"></div>
+    <div class="win-modal-card">
+      <div class="win-modal-head">
+        <span>新建分组</span>
+        <button class="win-modal-close" id="newgroup-close" type="button" aria-label="关闭">✕</button>
+      </div>
+      <div class="group-modal-body">
+        <div class="win-field-label">上级分组</div>
+        <select class="win-input" id="newgroup-parent"></select>
+        <div class="win-field-label">分组名称</div>
+        <input class="win-input" id="newgroup-name" placeholder="例如：记者部">
+        <div class="group-modal-actions">
+          <button class="tb-btn" id="newgroup-cancel" type="button">取消</button>
+          <button class="tb-btn primary" id="newgroup-ok" type="button">创建</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="win-modal" id="editgroup-modal" hidden>
+    <div class="win-modal-backdrop" id="editgroup-backdrop"></div>
+    <div class="win-modal-card">
+      <div class="win-modal-head">
+        <span>编辑分组</span>
+        <button class="win-modal-close" id="editgroup-close" type="button" aria-label="关闭">✕</button>
+      </div>
+      <div class="group-modal-body">
+        <div class="win-field-label">分组名称</div>
+        <input class="win-input" id="editgroup-name" placeholder="分组名称">
+        <div class="win-field-label">上级分组</div>
+        <select class="win-input" id="editgroup-parent"></select>
+        <div class="group-modal-actions">
+          <button class="tb-btn" id="editgroup-cancel" type="button">取消</button>
+          <button class="tb-btn primary" id="editgroup-ok" type="button">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <datalist id="group-options"></datalist>
+
+  <script>
+    (function(){
+      var DAYS = ['周一','周二','周三','周四','周五','周六','周日'];
+      var GROUPS = [{label:'上午',from:1,to:4},{label:'下午',from:5,to:8},{label:'晚上',from:9,to:11}];
+
+      function wk(from, to, parity){
+        var out = [];
+        for(var i=from;i<=to;i++){
+          if(parity==='odd' && i%2===0) continue;
+          if(parity==='even' && i%2!==0) continue;
+          out.push(i);
+        }
+        return out;
+      }
+
+      function c(name, day, start, end, weeks, location, teacher){
+        return {name:name, day:day, start:start, end:end, weeks:weeks, location:location||'', teacher:teacher||''};
+      }
+
+      var FALLBACK_PEOPLE = [
+        { name:'卢本轩', student_id:'25198036', semester:'2026-2027学年第1学期', group:'示例A组', courses:[
+          c('电子电工学',1,1,2,wk(1,14),'博文303','张轶扉'),
+          c('电子电工学',4,1,2,wk(1,14),'博文311','张轶扉'),
+          c('毛泽东思想和中国特色社会主义理论体系概论',2,1,2,wk(1,15),'博文108','外聘3'),
+          c('线性代数',5,1,2,wk(1,15),'博文205','单佳文'),
+          c('线性代数',1,3,4,wk(2,18,'even'),'博文205','单佳文'),
+          c('大学英语3（高阶英语）',2,3,4,wk(1,18),'汇文309','李哲'),
+          c('体育3',3,3,4,wk(1,15),'未排地点','冯立刚'),
+          c('化工仪表及自动化',1,5,6,wk(1,12),'博文404','张轶扉'),
+          c('化工制图与CAD实验',2,5,8,wk(1,9),'信息楼机房112','张航'),
+          c('化工制图与CAD',1,7,8,wk(1,18),'博文203','张航'),
+          c('化工安全工程',4,7,8,wk(1,15),'博文411','于洲')
+        ]},
+        { name:'王小明', student_id:'25198037', semester:'2026-2027学年第1学期', group:'示例A组', courses:[
+          c('高等数学',1,1,2,wk(1,16),'博文101','刘洋'),
+          c('程序设计',1,3,4,wk(1,16),'信息楼机房201','陈晓'),
+          c('大学英语3',2,1,2,wk(1,16),'汇文205','王芳'),
+          c('数据结构',2,5,6,wk(1,16),'博文302','李强'),
+          c('大学物理',3,3,4,wk(1,16),'博文404','赵敏'),
+          c('体育3',4,3,4,wk(1,15),'操场','冯立刚')
+        ]},
+        { name:'李思雨', student_id:'25198038', semester:'2026-2027学年第1学期', group:'示例B组', courses:[
+          c('英语精读',1,3,4,wk(1,18),'外语楼301','孙悦'),
+          c('英语听力',2,1,2,wk(1,18),'外语楼302','周静'),
+          c('英语口语',2,3,4,wk(1,18),'外语楼303','吴桐'),
+          c('英语写作',3,1,2,wk(1,18),'外语楼304','郑爽'),
+          c('第二外语',4,3,4,wk(1,16),'外语楼305','林娜'),
+          c('翻译',5,1,2,wk(1,18),'外语楼306','何平')
+        ]}
+      ];
+
+      var DEFAULT_APP_INFO = { name:'多人空课表', version:'2.1', developer:'阿山', contact:'ashan441@163.com', copyright:'© 2026 阿山' };
+
+      var state = { people: [], groups: [], selected: new Set(), semester: 'all', group: 'all', week: 1, search: '', sort: 'default' };
+
+      function esc(s){
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function personSemester(p){
+        return p.semester || '未标注学期';
+      }
+
+      function personGroup(p){
+        return p.group || '未分组';
+      }
+
+      function groupNames(){
+        return state.groups.map(function(g){ return g.name; });
+      }
+
+      function childrenOf(parent){
+        parent = parent || '';
+        return state.groups
+          .filter(function(g){ return (g.parent || '') === parent; })
+          .map(function(g){ return g.name; });
+      }
+
+      function groupDescendants(name){
+        var out = [name];
+        var queue = [name];
+        var guard = 0;
+        while(queue.length && guard++ < 500){
+          var current = queue.shift();
+          childrenOf(current).forEach(function(child){
+            if(out.indexOf(child) === -1){ out.push(child); queue.push(child); }
+          });
+        }
+        return out;
+      }
+
+      function matchesGroupFilter(p){
+        if(state.group === 'all') return true;
+        if(state.group === '未分组') return !p.group;
+        return groupDescendants(state.group).indexOf(p.group) !== -1;
+      }
+
+      function visibleIndices(){
+        var out = [];
+        for(var i=0; i<state.people.length; i++){
+          var p = state.people[i];
+          if(state.semester !== 'all' && personSemester(p) !== state.semester) continue;
+          if(!matchesGroupFilter(p)) continue;
+          out.push(i);
+        }
+        return out;
+      }
+
+      function visiblePeopleInGroup(g){
+        var out = [];
+        for(var i=0; i<state.people.length; i++){
+          var p = state.people[i];
+          if(state.semester !== 'all' && personSemester(p) !== state.semester) continue;
+          if(personGroup(p) !== g) continue;
+          out.push(i);
+        }
+        return out;
+      }
+
+      function hasUngrouped(){
+        for(var i=0; i<state.people.length; i++){
+          var p = state.people[i];
+          if(state.semester !== 'all' && personSemester(p) !== state.semester) continue;
+          if(!p.group) return true;
+        }
+        return false;
+      }
+
+      function personMatchesSearch(p){
+        if(!state.search) return true;
+        return (p.name || '').indexOf(state.search) !== -1 ||
+          String(p.student_id || '').indexOf(state.search) !== -1;
+      }
+
+      function sortPersonIndices(list){
+        if(state.sort === 'name'){
+          return list.slice().sort(function(a, b){
+            return String(state.people[a].name || '').localeCompare(String(state.people[b].name || ''), 'zh');
+          });
+        }
+        if(state.sort === 'id'){
+          return list.slice().sort(function(a, b){
+            return String(state.people[a].student_id || '').localeCompare(String(state.people[b].student_id || ''));
+          });
+        }
+        return list;
+      }
+
+      function sidebarPeopleInGroup(name){
+        return sortPersonIndices(visiblePeopleInGroup(name).filter(function(i){
+          return personMatchesSearch(state.people[i]);
+        }));
+      }
+
+      function personInStatsScope(index){
+        var p = state.people[index];
+        if(!p) return false;
+        if(state.semester !== 'all' && personSemester(p) !== state.semester) return false;
+        return matchesGroupFilter(p);
+      }
+
+      function groupSelectionIndices(name){
+        var ungrouped = name === '未分组';
+        var tree = ungrouped ? [] : groupDescendants(name);
+        var out = [];
+        for(var i=0; i<state.people.length; i++){
+          var p = state.people[i];
+          if(state.semester !== 'all' && personSemester(p) !== state.semester) continue;
+          if(ungrouped){
+            if(!p.group) out.push(i);
+          } else if(tree.indexOf(p.group) !== -1){
+            out.push(i);
+          }
+        }
+        return out;
+      }
+
+      function groupAllSelected(name){
+        var indices = groupSelectionIndices(name);
+        if(!indices.length) return false;
+        for(var k=0; k<indices.length; k++){
+          if(!state.selected.has(indices[k])) return false;
+        }
+        return true;
+      }
+
+      function setGroupSelection(name, checked){
+        if(!name) return;
+        var indices = groupSelectionIndices(name);
+        if(!indices.length) return;
+        indices.forEach(function(i){
+          if(checked) state.selected.add(i); else state.selected.delete(i);
+        });
+        renderAll();
+      }
+
+      function selectedList(){
+        var vis = {};
+        visibleIndices().forEach(function(i){ vis[i] = true; });
+        return Array.from(state.selected).filter(function(i){ return vis[i]; }).sort(function(a,b){ return a-b; });
+      }
+
+      function isBusy(person, day, period, week){
+        return person.courses.some(function(course){
+          return course.day===day && period>=course.start && period<=course.end && course.weeks.indexOf(week)!==-1;
+        });
+      }
+
+      function freePeople(day, period, week){
+        return selectedList().filter(function(i){ return !isBusy(state.people[i], day, period, week); });
+      }
+
+      function alwaysFree(day, period){
+        var base = selectedList();
+        for(var w=1; w<=18; w++){
+          base = base.filter(function(i){ return !isBusy(state.people[i], day, period, w); });
+        }
+        return base;
+      }
+
+      function cellFor(day, period){
+        var sel = selectedList();
+        if(sel.length===0) return {kind:'none', text:'—'};
+        var idx, label;
+        if(state.week==='all'){ idx = alwaysFree(day, period); label='全程有空'; }
+        else { idx = freePeople(day, period, state.week); label='空闲'; }
+        if(idx.length===0) return {kind:'none', text: state.week==='all' ? '无全程空闲' : '全员有课'};
+        var names = idx.map(function(i){ return state.people[i].name; });
+        if(idx.length===sel.length) return {kind:'full', count:idx.length, label:'全员'+label, names:names};
+        return {kind:'some', count:idx.length, label:idx.length+'人'+label, names:names};
+      }
+
+      function renderGrid(){
+        var tbody = document.getElementById('grid-body');
+        var legend = document.getElementById('legend');
+
+        if(state.people.length===0){
+          legend.hidden = true;
+          tbody.innerHTML = '<tr><td colspan="8" class="grid-empty">' +
+            '<div class="grid-empty-title">还没有课表数据</div>' +
+            '<div class="grid-empty-sub">选择教务系统导出的 PDF 文件，开始统计多人空课表。</div>' +
+            '<button class="tb-btn primary" type="button" data-action="empty-import">导入课表</button>' +
+            '</td></tr>';
+          document.getElementById('status-summary').textContent = '暂无人员';
+          document.getElementById('status-week').textContent = '';
+          return;
+        }
+        legend.hidden = false;
+
+        var html = '';
+        var total = selectedList().length;
+        GROUPS.forEach(function(g){
+          html += '<tr class="group-row"><td colspan="8">'+g.label+'</td></tr>';
+          for(var p=g.from;p<=g.to;p++){
+            html += '<tr><td class="period-cell">第'+p+'节</td>';
+            for(var d=1;d<=7;d++){
+              var s = cellFor(d, p);
+              var inner, style='';
+              if(s.kind==='none'){
+                inner = '<div class="cell-sub">'+s.text+'</div>';
+              } else {
+                var ratio = total > 0 ? s.count / total : 0;
+                var mix = Math.max(12, Math.round(ratio * 72));
+                style = ' style="--mix:'+mix+'%"';
+                inner = '<div class="cell-big">'+s.count+'</div><div class="cell-sub">/'+total+'</div>';
+              }
+              html += '<td class="slot '+s.kind+'" data-day="'+d+'" data-period="'+p+'"'+style+'>'+inner+'</td>';
+            }
+            html += '</tr>';
+          }
+        });
+        tbody.innerHTML = html;
+        updateStatus();
+        refreshRosterIfOpen();
+      }
+
+      function updateStatus(){
+        var sel = selectedList();
+        if(sel.length===0){
+          document.getElementById('status-summary').textContent = '请至少选择一人';
+          return;
+        }
+        var weekLabel = state.week==='all' ? '全程有空' : '第'+state.week+'周';
+        var bestCount = 0, bestSlots = [];
+        for(var d=1;d<=7;d++) for(var p=1;p<=11;p++){
+          var fp = state.week==='all' ? alwaysFree(d,p) : freePeople(d,p,state.week);
+          if(fp.length>bestCount){
+            bestCount = fp.length;
+            bestSlots = [DAYS[d-1]+' 第'+p+'节'];
+          } else if(fp.length===bestCount && fp.length>0){
+            bestSlots.push(DAYS[d-1]+' 第'+p+'节');
+          }
+        }
+        var shown = bestSlots.slice(0,3).join('、');
+        if(bestSlots.length>3) shown += ' 等';
+        document.getElementById('status-summary').innerHTML = '空闲人数最多 <strong>'+bestCount+'</strong> 人（'+shown+'）';
+        document.getElementById('status-week').textContent = weekLabel+' · 已选 '+sel.length+' 人';
+      }
+
+      var rosterSlot = null;
+      var rosterNames = [];
+
+      function rosterOpen(){
+        return !document.getElementById('roster-modal').hidden;
+      }
+
+      function refreshRosterIfOpen(){
+        if(rosterOpen()) renderRoster();
+      }
+
+      function openRoster(day, period){
+        rosterSlot = { day: day, period: period };
+        document.getElementById('roster-search').value = '';
+        renderRoster();
+        document.getElementById('roster-modal').hidden = false;
+      }
+
+      function closeRoster(){
+        document.getElementById('roster-modal').hidden = true;
+      }
+
+      function renderRoster(){
+        if(!rosterSlot) return;
+        var day = rosterSlot.day;
+        var period = rosterSlot.period;
+        var week = state.week;
+        var weekLabel = week === 'all' ? '全程有空' : '第' + week + '周';
+        var free = week === 'all' ? alwaysFree(day, period) : freePeople(day, period, week);
+        var total = selectedList().length;
+
+        document.getElementById('roster-title').textContent = DAYS[day - 1] + ' 第' + period + '节';
+        document.getElementById('roster-sub').textContent =
+          weekLabel + ' · 空闲 ' + free.length + ' / ' + total + ' 人';
+
+        var q = document.getElementById('roster-search').value.trim();
+        rosterNames = [];
+        var html = '';
+        free.forEach(function(i){
+          var p = state.people[i];
+          if(q && p.name.indexOf(q) === -1 && (p.student_id || '').indexOf(q) === -1) return;
+          rosterNames.push(p.name);
+          html += '<div class="roster-item">';
+          html += '<span class="roster-name">' + esc(p.name) + '</span>';
+          html += '<span class="roster-meta">' + esc(p.student_id || '') + '</span>';
+          html += '<span class="roster-group">' + esc(personGroup(p)) + '</span>';
+          html += '</div>';
+        });
+        document.getElementById('roster-list').innerHTML =
+          html || '<div class="win-sidebar-sub" style="padding:10px">没有匹配的人员</div>';
+      }
+
+      function copyRosterNames(){
+        if(!rosterNames.length){ showToast('没有可复制的名单'); return; }
+        var text = rosterNames.join('、');
+        var done = function(){ showToast('已复制 ' + rosterNames.length + ' 个姓名'); };
+        var fallback = function(){
+          var area = document.createElement('textarea');
+          area.value = text;
+          document.body.appendChild(area);
+          area.select();
+          var ok = false;
+          try { ok = document.execCommand('copy'); } catch(e) { ok = false; }
+          document.body.removeChild(area);
+          if(ok) done(); else showToast('复制失败，请手动选择名单');
+        };
+        if(navigator.clipboard && navigator.clipboard.writeText){
+          navigator.clipboard.writeText(text).then(done).catch(fallback);
+        } else {
+          fallback();
+        }
+      }
+
+      function formatWeeks(weeks){
+        if(!weeks || !weeks.length) return '';
+        var arr = weeks.slice().sort(function(a, b){ return a - b; });
+        var runs = [];
+        var current = [arr[0]];
+        for(var k = 1; k < arr.length; k++){
+          if(arr[k] === arr[k - 1] + 1) current.push(arr[k]);
+          else { runs.push(current); current = [arr[k]]; }
+        }
+        runs.push(current);
+
+        var merged = [];
+        var idx = 0;
+        while(idx < runs.length){
+          var run = runs[idx];
+          if(run.length === 1){
+            var seq = [run[0]];
+            var j = idx + 1;
+            while(j < runs.length && runs[j].length === 1 && runs[j][0] === seq[seq.length - 1] + 2){
+              seq.push(runs[j][0]);
+              j++;
+            }
+            if(seq.length >= 3){
+              merged.push({ from: seq[0], to: seq[seq.length - 1], parity: seq[0] % 2 ? '单' : '双' });
+              idx = j;
+              continue;
+            }
+          }
+          merged.push({ from: run[0], to: run[run.length - 1], parity: null });
+          idx++;
+        }
+
+        return merged.map(function(seg){
+          var text = (seg.from === seg.to ? String(seg.from) : seg.from + '-' + seg.to) + '周';
+          if(seg.parity) text += '(' + seg.parity + ')';
+          return text;
+        }).join('、');
+      }
+
+      function openPersonModal(index){
+        var person = state.people[index];
+        if(!person) return;
+
+        document.getElementById('person-title').textContent =
+          person.name + (person.student_id ? '（' + person.student_id + '）' : '');
+        document.getElementById('person-sub').textContent =
+          personSemester(person) + ' · ' + personGroup(person) + ' · 共 ' + person.courses.length + ' 门课';
+
+        document.getElementById('person-courses').innerHTML = buildPersonGrid(person);
+        document.getElementById('person-modal').hidden = false;
+      }
+
+      function buildPersonGrid(person){
+        var layout = {};
+        for(var day = 1; day <= 7; day++){
+          var dayCourses = person.courses.filter(function(c){ return c.day === day; });
+          var starts = [];
+          dayCourses.forEach(function(c){
+            if(starts.indexOf(c.start) === -1) starts.push(c.start);
+          });
+          starts.sort(function(a, b){ return a - b; });
+
+          var cells = {};
+          var covered = {};
+          starts.forEach(function(p, idx){
+            var group = dayCourses.filter(function(c){ return c.start === p; });
+            var maxEnd = 0;
+            group.forEach(function(c){ if(c.end > maxEnd) maxEnd = c.end; });
+            var nextStart = (idx + 1 < starts.length) ? starts[idx + 1] : 12;
+            var span = Math.min(maxEnd, nextStart - 1) - p + 1;
+            if(span < 1) span = 1;
+            cells[p] = { courses: group, rowspan: span };
+            for(var k = 1; k < span; k++) covered[p + k] = true;
+          });
+          layout[day] = { cells: cells, covered: covered };
+        }
+
+        var html = '<table class="person-grid"><thead><tr><th class="pg-period">节次</th>';
+        for(var d = 1; d <= 7; d++) html += '<th>' + DAYS[d - 1] + '</th>';
+        html += '</tr></thead><tbody>';
+
+        GROUPS.forEach(function(g){
+          html += '<tr class="pg-group"><td colspan="8">' + g.label + '</td></tr>';
+          for(var p = g.from; p <= g.to; p++){
+            html += '<tr><td class="pg-period">第' + p + '节</td>';
+            for(var day = 1; day <= 7; day++){
+              var cell = layout[day];
+              if(cell.covered[p]) continue;
+              var entry = cell.cells[p];
+              if(!entry){
+                html += '<td></td>';
+                continue;
+              }
+              html += '<td rowspan="' + entry.rowspan + '">';
+              entry.courses.forEach(function(c){
+                html += '<div class="pc-course">';
+                html += '<div class="pc-name">' + esc(c.name) + '</div>';
+                html += '<div class="pc-meta">' + c.start + '-' + c.end + '节' + (c.location ? ' · ' + esc(c.location) : '') + '</div>';
+                html += '<div class="pc-meta">' + esc(formatWeeks(c.weeks)) + '</div>';
+                html += '</div>';
+              });
+              html += '</td>';
+            }
+            html += '</tr>';
+          }
+        });
+
+        html += '</tbody></table>';
+        return html;
+      }
+
+      function closePersonModal(){
+        document.getElementById('person-modal').hidden = true;
+      }
+
+      function populateWeekSelect(){
+        var sel = document.getElementById('week-select');
+        var html = '';
+        for(var i=1;i<=18;i++) html += '<option value="'+i+'">第'+i+'周</option>';
+        html += '<option value="all">全程有空（汇总）</option>';
+        sel.innerHTML = html;
+        sel.value = String(state.week);
+      }
+
+      function populateSemesterSelect(){
+        var sel = document.getElementById('semester-select');
+        var semesters = [];
+        state.people.forEach(function(p){
+          var s = personSemester(p);
+          if(semesters.indexOf(s) === -1) semesters.push(s);
+        });
+        semesters.sort();
+        var html = '<option value="all">全部学期</option>';
+        semesters.forEach(function(s){ html += '<option value="'+s+'">'+s+'</option>'; });
+        sel.innerHTML = html;
+        if(state.semester !== 'all' && semesters.indexOf(state.semester) === -1){
+          state.semester = 'all';
+        }
+        sel.value = state.semester;
+      }
+
+      function populateGroupSelect(){
+        var sel = document.getElementById('group-select');
+        var html = '<option value="all">全部分组</option>' + groupOptionsHtml();
+        if(hasUngrouped()) html += '<option value="未分组">未分组</option>';
+        sel.innerHTML = html;
+        var valid = ['all'].concat(groupNames());
+        if(hasUngrouped()) valid.push('未分组');
+        if(valid.indexOf(state.group) === -1) state.group = 'all';
+        sel.value = state.group;
+      }
+
+      function groupOptionsHtml(){
+        var html = '';
+        (function addLevel(parent, depth){
+          childrenOf(parent).forEach(function(name){
+            var pad = new Array(depth + 1).join('　');
+            html += '<option value="'+esc(name)+'">'+pad+esc(name)+'</option>';
+            addLevel(name, depth + 1);
+          });
+        })('', 0);
+        return html;
+      }
+
+      function updatePeopleCount(){
+        document.getElementById('people-count').innerHTML = '已选 <strong>'+selectedList().length+'</strong> / '+visibleIndices().length+' 人';
+        document.getElementById('checked-count').textContent = selectedList().length
+          ? ('已勾选 ' + selectedList().length + ' 人')
+          : '未勾选任何人';
+      }
+
+      function renderPeople(){
+        var el = document.getElementById('people-list');
+        var html = '';
+        if(state.people.length === 0){
+          html = '<div class="win-sidebar-sub">暂无人员</div>';
+        } else {
+          childrenOf('').forEach(function(name){ html += renderGroupBlock(name, 0); });
+          if(hasUngrouped()) html += renderUngroupedBlock();
+          if(!html){
+            html = '<div class="win-sidebar-sub">还没有分组，点上方「＋ 新建分组」开始整理</div>';
+          }
+        }
+        el.innerHTML = html;
+        el.querySelectorAll('.person-check').forEach(function(cb){
+          cb.addEventListener('change', function(){
+            var idx = Number(cb.getAttribute('data-idx'));
+            if(cb.checked) state.selected.add(idx); else state.selected.delete(idx);
+            cb.closest('.person-item').classList.toggle('is-off', !cb.checked);
+            renderGrid();
+            updatePeopleCount();
+          });
+        });
+      }
+
+      function renderPersonRow(i){
+        var p = state.people[i];
+        var checked = state.selected.has(i);
+        var inScope = personInStatsScope(i);
+        var html = '';
+        html += '<label class="person-item'+(checked?'':' is-off')+(inScope?'':' out-of-scope')+'" draggable="true" data-idx="'+i+'"'+(inScope?'':' title="不在当前统计范围（被分组筛选排除），可拖动调整归属"')+'>';
+        html += '<input type="checkbox" class="person-check" data-idx="'+i+'"'+(checked?' checked':'')+(inScope?'':' disabled')+'>';
+        html += '<span class="person-avatar">'+esc(p.name.charAt(0))+'</span>';
+        html += '<span class="person-info"><span class="person-name person-open" data-open="'+i+'" title="点击查看该人员课表">'+esc(p.name)+'</span><span class="person-major">'+esc(p.student_id||'')+'</span></span>';
+        html += '<button class="person-del" type="button" data-del="'+i+'" title="删除该人员">×</button>';
+        html += '</label>';
+        return html;
+      }
+
+      function renderGroupBlock(name, depth){
+        var direct = sidebarPeopleInGroup(name);
+        var kids = childrenOf(name);
+        var total = groupSelectionIndices(name).length;
+        var filtered = state.group === name;
+
+        var html = '';
+        html += '<div class="group-block'+(filtered?' is-filtered':'')+'" data-group="'+esc(name)+'" style="margin-left:'+(depth * 12)+'px">';
+        html += '<div class="group-header" draggable="true" data-group="'+esc(name)+'">';
+        html += '<span class="group-name group-name-edit" data-edit="'+esc(name)+'" title="点击编辑分组名称和上级">'+esc(name)+' · '+total+' 人</span>';
+        html += '<span class="group-tools">';
+        html += '<input type="checkbox" class="group-check" data-check="'+esc(name)+'" title="全选 / 取消本组人员"'+(groupAllSelected(name) ? ' checked' : '')+'>';
+        html += '<button class="group-btn group-move" type="button" data-move="up" data-group="'+esc(name)+'" title="上移">▲</button>';
+        html += '<button class="group-btn group-move" type="button" data-move="down" data-group="'+esc(name)+'" title="下移">▼</button>';
+        html += '<button class="group-btn group-del" type="button" data-group="'+esc(name)+'" title="删除分组及子分组">×</button>';
+        html += '</span>';
+        html += '</div>';
+        direct.forEach(function(i){ html += renderPersonRow(i); });
+        kids.forEach(function(child){ html += renderGroupBlock(child, depth + 1); });
+        if(direct.length === 0 && kids.length === 0){
+          html += '<div class="group-empty">拖到这里</div>';
+        }
+        html += '</div>';
+        return html;
+      }
+
+      function renderUngroupedBlock(){
+        var indices = sidebarPeopleInGroup('未分组');
+        var total = groupSelectionIndices('未分组').length;
+        var html = '<div class="group-block" data-group="未分组">';
+        html += '<div class="group-header"><span class="group-name">未分组 · '+total+' 人</span>';
+        html += '<span class="group-tools"><input type="checkbox" class="group-check" data-check="未分组" title="全选 / 取消本组人员"'+(groupAllSelected('未分组') ? ' checked' : '')+'></span>';
+        html += '</div>';
+        indices.forEach(function(i){ html += renderPersonRow(i); });
+        if(indices.length === 0 && total === 0) html += '<div class="group-empty">拖到这里</div>';
+        html += '</div>';
+        return html;
+      }
+
+      async function assignPersonToGroup(index, groupName){
+        if(!state.people[index]) return;
+        var target = groupName === '未分组' ? '' : groupName;
+        if((state.people[index].group || '') === target) return;
+
+        await waitForPywebview();
+        if(isDesktop()){
+          try {
+            var res = await window.pywebview.api.set_groups([{ index: index, group: target }]);
+            state.people = res.people;
+            state.groups = res.groups;
+          } catch(e) {
+            showToast('分组失败：' + (e && e.message ? e.message : e));
+            return;
+          }
+        } else {
+          state.people[index].group = target;
+          if(target && groupNames().indexOf(target) === -1) state.groups.push({ name: target, parent: '' });
+        }
+
+        populateGroupSelect();
+        refreshGroupOptions();
+        renderAll();
+        showToast('已移动到「' + (groupName || '未分组') + '」');
+      }
+
+      function openNewGroupModal(){
+        document.getElementById('newgroup-name').value = '';
+        populateNewGroupParent();
+        document.getElementById('newgroup-modal').hidden = false;
+        document.getElementById('newgroup-name').focus();
+      }
+
+      function closeNewGroupModal(){
+        document.getElementById('newgroup-modal').hidden = true;
+      }
+
+      async function confirmNewGroup(){
+        var name = document.getElementById('newgroup-name').value.trim();
+        var parent = document.getElementById('newgroup-parent').value;
+        if(!name){ showToast('请输入分组名称'); return; }
+        if(groupNames().indexOf(name) !== -1){ showToast('分组「'+name+'」已存在'); return; }
+
+        await waitForPywebview();
+        if(isDesktop()){
+          var res = null;
+          try {
+            res = await window.pywebview.api.add_group(name, parent);
+          } catch(e) {
+            showToast('新建失败：' + (e && e.message ? e.message : e));
+            return;
+          }
+          state.groups = res.groups;
+          state.people = res.people;
+        } else {
+          state.groups.push({ name: name, parent: parent || '' });
+        }
+
+        closeNewGroupModal();
+        populateGroupSelect();
+        refreshGroupOptions();
+        populateGroupTarget();
+        renderAll();
+        showToast('已新建分组「'+name+'」');
+      }
+
+      var editGroupOriginal = "";
+
+      function populateEditGroupParent(name){
+        var sel = document.getElementById('editgroup-parent');
+        var blocked = groupDescendants(name);
+        var html = '<option value="">（顶层分组）</option>';
+        (function addLevel(parent, depth){
+          childrenOf(parent).forEach(function(child){
+            var pad = new Array(depth + 1).join('　');
+            if(blocked.indexOf(child) === -1){
+              html += '<option value="'+esc(child)+'">'+pad+esc(child)+'</option>';
+            }
+            addLevel(child, depth + 1);
+          });
+        })('', 0);
+        sel.innerHTML = html;
+      }
+
+      function openEditGroupModal(name){
+        if(!name || name === '未分组') return;
+        var group = null;
+        state.groups.forEach(function(g){ if(g.name === name) group = g; });
+        if(!group) return;
+
+        editGroupOriginal = name;
+        document.getElementById('editgroup-name').value = name;
+        populateEditGroupParent(name);
+        document.getElementById('editgroup-parent').value = group.parent || '';
+        document.getElementById('editgroup-modal').hidden = false;
+        document.getElementById('editgroup-name').focus();
+      }
+
+      function closeEditGroupModal(){
+        document.getElementById('editgroup-modal').hidden = true;
+      }
+
+      async function confirmEditGroup(){
+        var newName = document.getElementById('editgroup-name').value.trim();
+        var parent = document.getElementById('editgroup-parent').value;
+        if(!newName){ showToast('请输入分组名称'); return; }
+        if(newName !== editGroupOriginal && groupNames().indexOf(newName) !== -1){
+          showToast('分组「'+newName+'」已存在');
+          return;
+        }
+
+        await waitForPywebview();
+        if(isDesktop()){
+          try {
+            var res = await window.pywebview.api.update_group(editGroupOriginal, newName, parent);
+            state.groups = res.groups;
+            state.people = res.people;
+          } catch(e) {
+            showToast('保存失败：' + (e && e.message ? e.message : e));
+            return;
+          }
+        } else {
+          state.groups.forEach(function(g){
+            if(g.name === editGroupOriginal){ g.name = newName; g.parent = parent; }
+            else if(g.parent === editGroupOriginal){ g.parent = newName; }
+          });
+          state.people.forEach(function(p){
+            if(p.group === editGroupOriginal) p.group = newName;
+          });
+        }
+
+        if(state.group === editGroupOriginal) state.group = newName;
+        closeEditGroupModal();
+        populateGroupSelect();
+        refreshGroupOptions();
+        populateGroupTarget();
+        renderAll();
+        showToast('已更新分组');
+      }
+
+      async function doDeleteGroup(name){
+        await waitForPywebview();
+        if(isDesktop()){
+          try {
+            var res = await window.pywebview.api.remove_group(name);
+            state.groups = res.groups;
+            state.people = res.people;
+          } catch(e) {
+            showToast('删除失败：' + (e && e.message ? e.message : e));
+            return;
+          }
+        } else {
+          var targets = groupDescendants(name);
+          state.groups = state.groups.filter(function(g){ return targets.indexOf(g.name) === -1; });
+          state.people.forEach(function(p){ if(targets.indexOf(p.group) !== -1) p.group = ''; });
+        }
+
+        populateGroupSelect();
+        refreshGroupOptions();
+        populateGroupTarget();
+        renderAll();
+        showToast('已删除分组「'+name+'」，其成员已移到「未分组」');
+      }
+
+      var confirmAction = null;
+      function groupParentOf(name){
+        for(var i=0;i<state.groups.length;i++){
+          if(state.groups[i].name === name) return state.groups[i].parent || '';
+        }
+        return '';
+      }
+
+      async function applyGroupOrder(order){
+        await waitForPywebview();
+        if(isDesktop()){
+          try {
+            var res = await window.pywebview.api.reorder_groups(order);
+            state.groups = res.groups;
+            state.people = res.people;
+          } catch(e) {
+            showToast('调整顺序失败：' + (e && e.message ? e.message : e));
+            return;
+          }
+        } else {
+          var byName = {};
+          state.groups.forEach(function(g){ byName[g.name] = g; });
+          state.groups = order.map(function(n){ return byName[n]; }).filter(Boolean);
+        }
+        populateGroupSelect();
+        populateGroupTarget();
+        refreshGroupOptions();
+        renderAll();
+      }
+
+      function reorderGroupBefore(sourceName, targetName){
+        if(!sourceName || !targetName || sourceName === targetName) return;
+        if(groupParentOf(sourceName) !== groupParentOf(targetName)){
+          showToast('只能在同一个上级分组内调整顺序');
+          return;
+        }
+        var names = state.groups.map(function(g){ return g.name; });
+        var without = names.filter(function(n){ return n !== sourceName; });
+        var index = without.indexOf(targetName);
+        if(index === -1) return;
+        without.splice(index, 0, sourceName);
+        applyGroupOrder(without);
+      }
+
+      function moveGroup(name, direction){
+        if(!name) return;
+        var siblings = childrenOf(groupParentOf(name));
+        var position = siblings.indexOf(name);
+        if(position === -1) return;
+
+        if(direction === 'up'){
+          var before = siblings[position - 1];
+          if(!before) return;
+          reorderGroupBefore(name, before);
+          return;
+        }
+
+        var after = siblings[position + 1];
+        if(!after) return;
+        var names = state.groups.map(function(g){ return g.name; });
+        var without = names.filter(function(n){ return n !== name; });
+        var index = without.indexOf(after);
+        if(index === -1) return;
+        without.splice(index + 1, 0, name);
+        applyGroupOrder(without);
+      }
+
+      function openConfirm(title, message, onOk){
+        document.getElementById('confirm-title').textContent = title;
+        document.getElementById('confirm-message').textContent = message;
+        confirmAction = onOk;
+        document.getElementById('confirm-modal').hidden = false;
+      }
+      function closeConfirm(){
+        document.getElementById('confirm-modal').hidden = true;
+        confirmAction = null;
+      }
+      function runConfirm(){
+        var action = confirmAction;
+        closeConfirm();
+        if(typeof action === 'function') action();
+      }
+
+      function populateGroupTarget(){
+        var sel = document.getElementById('group-target');
+        sel.innerHTML = groupOptionsHtml() + '<option value="未分组">未分组</option>';
+      }
+
+      function populateNewGroupParent(){
+        var sel = document.getElementById('newgroup-parent');
+        sel.innerHTML = '<option value="">（顶层分组）</option>' + groupOptionsHtml();
+      }
+
+      function resetSelection(){
+        state.selected = new Set(visibleIndices());
+      }
+
+      function renderAll(){
+        renderPeople();
+        updatePeopleCount();
+        renderGrid();
+      }
+
+      function showToast(message){
+        var toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.hidden = false;
+        clearTimeout(showToast.timer);
+        showToast.timer = setTimeout(function(){ toast.hidden = true; }, 3200);
+      }
+
+      function isDesktop(){
+        return !!(window.pywebview && window.pywebview.api && typeof window.pywebview.api.get_people === 'function');
+      }
+
+      function waitForPywebview(){
+        return new Promise(function(resolve){
+          function apiReady(){
+            return !!(window.pywebview && window.pywebview.api && typeof window.pywebview.api.get_people === 'function');
+          }
+          if(apiReady()){
+            resolve();
+            return;
+          }
+          var done = false;
+          function finish(){
+            if(done) return;
+            done = true;
+            window.removeEventListener('pywebviewready', finish);
+            resolve();
+          }
+          window.addEventListener('pywebviewready', finish);
+          setTimeout(finish, 3000);
+        });
+      }
+
+      async function loadPeople(){
+        await waitForPywebview();
+        if(isDesktop()){
+          try {
+            state.people = await window.pywebview.api.get_people();
+            state.groups = await window.pywebview.api.get_groups();
+          } catch(e) {
+            state.people = [];
+            state.groups = [];
+          }
+        } else {
+          state.people = FALLBACK_PEOPLE;
+          state.groups = [{ name: '示例A组', parent: '' }, { name: '示例B组', parent: '' }];
+        }
+      }
+
+      function applyAppInfo(info){
+        info = info || DEFAULT_APP_INFO;
+        document.getElementById('app-version').textContent = 'v' + info.version;
+        document.getElementById('about-name').textContent = info.name;
+        document.getElementById('about-version').textContent = '版本 v' + info.version;
+        document.getElementById('about-dev').textContent = '开发者：' + info.developer;
+        document.getElementById('about-contact').textContent = info.contact || '';
+        document.getElementById('about-copyright').textContent = info.copyright || '';
+      }
+
+      async function loadAppInfo(){
+        await waitForPywebview();
+        var info = DEFAULT_APP_INFO;
+        if(isDesktop()){
+          try {
+            info = await window.pywebview.api.get_app_info();
+          } catch(e) {}
+        }
+        applyAppInfo(info);
+      }
+
+      function reloadFromState(){
+        populateSemesterSelect();
+        populateGroupSelect();
+        refreshGroupOptions();
+        populateGroupTarget();
+        resetSelection();
+        renderAll();
+      }
+
+      // 识别算法升级后，旧数据会自动重新识别一次，避免一直显示老结果。
+      async function refreshIfNeeded(){
+        if(!isDesktop()) return;
+        var info = null;
+        try {
+          info = await window.pywebview.api.get_app_info();
+        } catch(e) {
+          return;
+        }
+        if(!info || !info.needs_refresh) return;
+        showToast('识别算法已更新，正在重新识别已导入的课表…');
+        try {
+          var res = await window.pywebview.api.refresh_schedules();
+          if(res && res.people){
+            state.people = res.people;
+            state.groups = res.groups || state.groups;
+            reloadFromState();
+          }
+          var failed = (res && res.missing ? res.missing : []);
+          if(failed.length){
+            showToast('已重新识别，但有 '+failed.length+' 人的课表 PDF 不在原位置，请重新导入：'+failed.slice(0,3).join('、')+(failed.length>3?' 等':''));
+          } else if(res && res.refreshed){
+            showToast('已按新版识别更新 '+res.refreshed+' 人的课表。');
+          }
+        } catch(e) {
+          showToast('重新识别失败，请重新导入课表。');
+        }
+      }
+
+      var importTimer = null;
+
+      function showProgress(done, total, note){
+        var box = document.getElementById('progress');
+        box.hidden = false;
+        var percent = total > 0 ? Math.min(100, Math.round(done / total * 100)) : 0;
+        document.getElementById('progress-title').textContent = '正在识别课表…';
+        document.getElementById('progress-count').textContent = done + ' / ' + total;
+        document.getElementById('progress-fill').style.width = percent + '%';
+        document.getElementById('progress-note').textContent = note || '';
+      }
+
+      function hideProgress(){
+        document.getElementById('progress').hidden = true;
+      }
+
+      async function reloadFromBackend(){
+        state.people = await window.pywebview.api.get_people();
+        state.groups = await window.pywebview.api.get_groups();
+        populateSemesterSelect();
+        populateGroupSelect();
+        refreshGroupOptions();
+        populateGroupTarget();
+        resetSelection();
+        renderAll();
+      }
+
+      // 后台导入 + 轮询进度：人数多时也能看到进度
+      async function runImport(kind, group){
+        await waitForPywebview();
+        if(!isDesktop()){
+          showToast('浏览器预览模式：请在桌面应用中导入真实课表。');
+          return;
+        }
+        var res = null;
+        try {
+          res = await window.pywebview.api.start_import(kind, group || '');
+        } catch(e) {
+          showToast('导入失败：' + (e && e.message ? e.message : e));
+          return;
+        }
+        if(res && res.cancelled) return;
+        if(res && res.busy){ showToast('正在导入中，请稍候。'); return; }
+        if(!res || !res.started){ showToast('没有找到可导入的 PDF 文件。'); return; }
+        showProgress(0, res.total, res.folder ? ('文件夹：' + res.folder) : '准备识别…');
+        pollImport();
+      }
+
+      function pollImport(){
+        clearTimeout(importTimer);
+        window.pywebview.api.get_import_status().then(function(st){
+          if(!st){ hideProgress(); return; }
+          var note = st.current ? ('正在识别：' + st.current) : (st.folder || '');
+          showProgress(st.done, st.total, note);
+          if(st.running){
+            importTimer = setTimeout(pollImport, 400);
+            return;
+          }
+          hideProgress();
+          return reloadFromBackend().then(function(){
+            var errors = st.errors || [];
+            var parts = [];
+            if(st.added) parts.push('新增 ' + st.added + ' 人');
+            if(st.updated) parts.push('更新 ' + st.updated + ' 人');
+            var summary = parts.length ? parts.join('，') : '本次没有新增人员';
+            if(errors.length){
+              var names = errors.slice(0, 3).map(function(item){
+                return String(item.path || '').split(/[\\/]/).pop();
+              }).join('、');
+              showToast('导入完成：' + summary + '；' + errors.length + ' 个文件没识别成功（' + names + (errors.length > 3 ? ' 等' : '') + '）。');
+            } else {
+              showToast('导入完成：' + summary + '，当前共 ' + state.people.length + ' 人。');
+            }
+          });
+        }).catch(function(){
+          hideProgress();
+          showToast('导入过程中断，请重试。');
+        });
+      }
+
+      function refreshGroupOptions(){
+        var html = '';
+        groupNames().sort().forEach(function(g){ html += '<option value="'+esc(g)+'"></option>'; });
+        document.getElementById('group-options').innerHTML = html;
+      }
+
+      function openImportModal(){
+        document.getElementById('import-group-input').value = state.group !== 'all' ? state.group : '';
+        refreshGroupOptions();
+        document.getElementById('import-modal').hidden = false;
+      }
+
+      function closeImportModal(){
+        document.getElementById('import-modal').hidden = true;
+      }
+
+      async function confirmImport(){
+        await startImportFromModal('files');
+      }
+
+      async function confirmImportFolder(){
+        await startImportFromModal('folder');
+      }
+
+      async function startImportFromModal(kind){
+        var group = document.getElementById('import-group-input').value.trim();
+        closeImportModal();
+        await runImport(kind, group);
+      }
+
+      var groupPicked = new Set();
+
+      function renderGroupManageList(){
+        var q = document.getElementById('group-search').value.trim();
+        var el = document.getElementById('group-manage-list');
+        var html = '';
+        state.people.forEach(function(p, i){
+          if(q && p.name.indexOf(q) === -1 && (p.student_id || '').indexOf(q) === -1) return;
+          var checked = groupPicked.has(i);
+          html += '<label class="group-person">';
+          html += '<input type="checkbox" class="group-pick" data-idx="'+i+'"'+(checked?' checked':'')+'>';
+          html += '<span class="gp-name">'+esc(p.name)+'</span>';
+          html += '<span class="gp-group">'+personGroup(p)+'</span>';
+          html += '</label>';
+        });
+        el.innerHTML = html || '<div class="win-sidebar-sub" style="padding:10px">无匹配人员</div>';
+        updateGroupPickedCount();
+      }
+
+      function updateGroupPickedCount(){
+        document.getElementById('group-picked-count').textContent =
+          '已选 ' + groupPicked.size + ' / ' + state.people.length + ' 人';
+      }
+
+      function setAllGroupPicks(checked){
+        Array.prototype.forEach.call(document.querySelectorAll('.group-pick'), function(cb){
+          var index = Number(cb.getAttribute('data-idx'));
+          cb.checked = checked;
+          if(checked) groupPicked.add(index); else groupPicked.delete(index);
+        });
+        updateGroupPickedCount();
+      }
+
+      function openGroupModal(){
+        groupPicked = new Set();
+        document.getElementById('group-search').value = '';
+        populateGroupTarget();
+        refreshGroupOptions();
+        renderGroupManageList();
+        document.getElementById('group-modal').hidden = false;
+      }
+
+      function closeGroupModal(){
+        document.getElementById('group-modal').hidden = true;
+      }
+
+      async function applyGroupToSelected(){
+        var raw = document.getElementById('group-target').value;
+        var target = raw === '未分组' ? '' : raw;
+        if(groupPicked.size === 0){ showToast('请先勾选要调整的人员'); return; }
+
+        var assignments = [];
+        groupPicked.forEach(function(index){
+          assignments.push({ index: index, group: target });
+        });
+
+        if(isDesktop()){
+          await waitForPywebview();
+          try {
+            var res = await window.pywebview.api.set_groups(assignments);
+            state.people = res.people;
+            state.groups = res.groups;
+          } catch(e) {
+            showToast('分组失败：' + (e && e.message ? e.message : e));
+            return;
+          }
+        } else {
+          assignments.forEach(function(a){
+            if(state.people[a.index]) state.people[a.index].group = a.group;
+            if(a.group && groupNames().indexOf(a.group) === -1) state.groups.push({ name: a.group, parent: '' });
+          });
+        }
+
+        populateGroupSelect();
+        refreshGroupOptions();
+        populateGroupTarget();
+        renderAll();
+        groupPicked = new Set();
+        renderGroupManageList();
+        showToast('已把 '+assignments.length+' 人归入「'+(target || '未分组')+'」');
+      }
+
+      function removePickedPeople(){
+        if(groupPicked.size === 0){ showToast('请先勾选要删除的人员'); return; }
+        var count = groupPicked.size;
+        openConfirm('删除人员', '确定删除选中的 ' + count + ' 人？删除后需要重新导入课表才能恢复。', function(){
+          doRemovePeople(Array.from(groupPicked));
+        });
+      }
+
+      // 侧栏里勾选若干人员后，批量删除
+      function removeCheckedPeople(){
+        var indices = selectedList();
+        if(!indices.length){ showToast('请先勾选要删除的人员'); return; }
+        var names = indices.slice(0, 3).map(function(i){
+          return state.people[i] ? state.people[i].name : '';
+        }).filter(Boolean).join('、');
+        var more = indices.length > 3 ? ' 等' : '';
+        openConfirm(
+          '删除人员',
+          '确定删除勾选的 ' + indices.length + ' 人（' + names + more + '）？删除后需要重新导入课表才能恢复。',
+          function(){ doRemovePeople(indices); }
+        );
+      }
+
+      async function doRemovePeople(indices){
+        if(!indices || !indices.length) return;
+        await waitForPywebview();
+        if(isDesktop()){
+          try {
+            var res = await window.pywebview.api.remove_people(indices);
+            state.people = res.people;
+            state.groups = res.groups;
+          } catch(e) {
+            showToast('删除失败：' + (e && e.message ? e.message : e));
+            return;
+          }
+        } else {
+          var drop = {};
+          indices.forEach(function(i){ drop[i] = true; });
+          state.people = state.people.filter(function(_, i){ return !drop[i]; });
+        }
+
+        groupPicked = new Set();
+        populateSemesterSelect();
+        populateGroupSelect();
+        refreshGroupOptions();
+        populateGroupTarget();
+        resetSelection();
+        renderAll();
+        renderGroupManageList();
+        showToast('已删除 ' + indices.length + ' 人');
+      }
+
+      document.getElementById('week-select').addEventListener('change', function(e){
+        var v = e.target.value;
+        state.week = v==='all' ? 'all' : Number(v);
+        renderGrid();
+      });
+
+      document.getElementById('semester-select').addEventListener('change', function(){
+        state.semester = document.getElementById('semester-select').value;
+        resetSelection();
+        renderAll();
+      });
+
+      document.getElementById('group-select').addEventListener('change', function(){
+        state.group = document.getElementById('group-select').value;
+        resetSelection();
+        renderAll();
+      });
+
+      document.getElementById('import-btn').addEventListener('click', openImportModal);
+      document.getElementById('group-btn').addEventListener('click', openGroupModal);
+      document.getElementById('group-add-btn').addEventListener('click', openNewGroupModal);
+      document.getElementById('newgroup-ok').addEventListener('click', confirmNewGroup);
+      document.getElementById('people-remove-btn').addEventListener('click', removeCheckedPeople);
+      document.getElementById('newgroup-cancel').addEventListener('click', closeNewGroupModal);
+      document.getElementById('newgroup-close').addEventListener('click', closeNewGroupModal);
+      document.getElementById('newgroup-backdrop').addEventListener('click', closeNewGroupModal);
+      document.getElementById('newgroup-name').addEventListener('keydown', function(e){
+        if(e.key === 'Enter') confirmNewGroup();
+      });
+      document.getElementById('editgroup-ok').addEventListener('click', confirmEditGroup);
+      document.getElementById('editgroup-cancel').addEventListener('click', closeEditGroupModal);
+      document.getElementById('editgroup-close').addEventListener('click', closeEditGroupModal);
+      document.getElementById('editgroup-backdrop').addEventListener('click', closeEditGroupModal);
+      document.getElementById('editgroup-name').addEventListener('keydown', function(e){
+        if(e.key === 'Enter') confirmEditGroup();
+      });
+      document.getElementById('people-search').addEventListener('input', function(e){
+        state.search = e.target.value.trim();
+        renderPeople();
+      });
+      document.getElementById('people-sort').addEventListener('change', function(e){
+        state.sort = e.target.value;
+        renderPeople();
+      });
+      document.getElementById('confirm-close').addEventListener('click', closeConfirm);
+      document.getElementById('confirm-cancel').addEventListener('click', closeConfirm);
+      document.getElementById('confirm-backdrop').addEventListener('click', closeConfirm);
+      document.getElementById('confirm-ok').addEventListener('click', runConfirm);
+      document.getElementById('roster-close').addEventListener('click', closeRoster);
+      document.getElementById('roster-backdrop').addEventListener('click', closeRoster);
+      document.getElementById('roster-copy').addEventListener('click', copyRosterNames);
+      document.getElementById('roster-search').addEventListener('input', renderRoster);
+      document.getElementById('person-close').addEventListener('click', closePersonModal);
+      document.getElementById('person-backdrop').addEventListener('click', closePersonModal);
+      document.getElementById('export-btn').addEventListener('click', function(){ showToast('导出功能开发中，下一版本提供。'); });
+      document.getElementById('about-btn').addEventListener('click', function(){ document.getElementById('about-modal').hidden = false; });
+      document.getElementById('about-close').addEventListener('click', function(){ document.getElementById('about-modal').hidden = true; });
+      document.getElementById('about-backdrop').addEventListener('click', function(){ document.getElementById('about-modal').hidden = true; });
+      document.getElementById('import-close').addEventListener('click', closeImportModal);
+      document.getElementById('import-cancel').addEventListener('click', closeImportModal);
+      document.getElementById('import-backdrop').addEventListener('click', closeImportModal);
+      document.getElementById('import-confirm').addEventListener('click', confirmImport);
+      document.getElementById('import-folder').addEventListener('click', confirmImportFolder);
+      document.getElementById('group-close').addEventListener('click', closeGroupModal);
+      document.getElementById('group-backdrop').addEventListener('click', closeGroupModal);
+      document.getElementById('group-search').addEventListener('input', renderGroupManageList);
+      document.getElementById('group-apply').addEventListener('click', applyGroupToSelected);
+      document.getElementById('group-remove').addEventListener('click', removePickedPeople);
+      document.getElementById('group-select-all').addEventListener('click', function(){ setAllGroupPicks(true); });
+      document.getElementById('group-select-none').addEventListener('click', function(){ setAllGroupPicks(false); });
+      document.getElementById('group-manage-list').addEventListener('change', function(e){
+        var target = e.target;
+        if(!target || !target.classList || !target.classList.contains('group-pick')) return;
+        var index = Number(target.getAttribute('data-idx'));
+        if(target.checked) groupPicked.add(index); else groupPicked.delete(index);
+        updateGroupPickedCount();
+      });
+
+      var peopleListEl = document.getElementById('people-list');
+      var dragIndex = null;
+      var dragGroupName = null;
+
+      function clearDropHighlight(){
+        Array.prototype.forEach.call(document.querySelectorAll('.group-block.over, .group-header.drop-target'), function(el){
+          el.classList.remove('over');
+          el.classList.remove('drop-target');
+        });
+      }
+
+      peopleListEl.addEventListener('click', function(e){
+        var edit = e.target.closest ? e.target.closest('.group-name-edit') : null;
+        if(edit){
+          e.preventDefault();
+          e.stopPropagation();
+          openEditGroupModal(edit.getAttribute('data-edit'));
+          return;
+        }
+        var open = e.target.closest ? e.target.closest('.person-open') : null;
+        if(open){
+          e.preventDefault();
+          e.stopPropagation();
+          openPersonModal(Number(open.getAttribute('data-open')));
+          return;
+        }
+        var personDel = e.target.closest ? e.target.closest('.person-del') : null;
+        if(personDel){
+          e.preventDefault();
+          e.stopPropagation();
+          var personIndex = Number(personDel.getAttribute('data-del'));
+          var person = state.people[personIndex];
+          if(person){
+            openConfirm('删除人员', '确定删除「' + person.name + '」？删除后需要重新导入课表才能恢复。', function(){
+              doRemovePeople([personIndex]);
+            });
+          }
+          return;
+        }
+        var del = e.target.closest ? e.target.closest('.group-del') : null;
+        if(del){
+          e.preventDefault();
+          var name = del.getAttribute('data-group');
+          openConfirm('删除分组', '确定删除「'+name+'」及其子分组？相关成员会移到「未分组」。', function(){
+            doDeleteGroup(name);
+          });
+          return;
+        }
+        var move = e.target.closest ? e.target.closest('.group-btn[data-move]') : null;
+        if(move){
+          e.preventDefault();
+          moveGroup(move.getAttribute('data-group'), move.getAttribute('data-move'));
+          return;
+        }
+      });
+
+      peopleListEl.addEventListener('change', function(e){
+        var box = e.target;
+        if(!box || !box.classList || !box.classList.contains('group-check')) return;
+        setGroupSelection(box.getAttribute('data-check'), box.checked);
+      });
+
+      peopleListEl.addEventListener('dragstart', function(e){
+        if(e.target.closest && e.target.closest('.group-btn, .group-check')){
+          e.preventDefault();
+          return;
+        }
+        var header = e.target.closest ? e.target.closest('.group-header') : null;
+        if(header && header.getAttribute('draggable') === 'true'){
+          dragGroupName = header.getAttribute('data-group');
+          dragIndex = null;
+          header.classList.add('dragging');
+          if(e.dataTransfer){
+            e.dataTransfer.effectAllowed = 'move';
+            try { e.dataTransfer.setData('text/plain', 'group:' + dragGroupName); } catch(err) {}
+          }
+          return;
+        }
+        var row = e.target.closest ? e.target.closest('.person-item') : null;
+        if(!row) return;
+        dragIndex = Number(row.getAttribute('data-idx'));
+        dragGroupName = null;
+        row.classList.add('dragging');
+        if(e.dataTransfer){
+          e.dataTransfer.effectAllowed = 'move';
+          try { e.dataTransfer.setData('text/plain', String(dragIndex)); } catch(err) {}
+        }
+      });
+
+      peopleListEl.addEventListener('dragend', function(){
+        Array.prototype.forEach.call(document.querySelectorAll('.person-item.dragging, .group-header.dragging'), function(el){
+          el.classList.remove('dragging');
+        });
+        clearDropHighlight();
+        dragIndex = null;
+        dragGroupName = null;
+      });
+
+      peopleListEl.addEventListener('dragover', function(e){
+        if(dragGroupName){
+          var header = e.target.closest ? e.target.closest('.group-header') : null;
+          if(!header || header.getAttribute('data-group') === dragGroupName) return;
+          e.preventDefault();
+          if(e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+          clearDropHighlight();
+          header.classList.add('drop-target');
+          return;
+        }
+        var block = e.target.closest ? e.target.closest('.group-block') : null;
+        if(!block) return;
+        e.preventDefault();
+        if(e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+        clearDropHighlight();
+        block.classList.add('over');
+      });
+
+      peopleListEl.addEventListener('dragleave', function(e){
+        var el = e.target.closest ? e.target.closest('.group-block, .group-header') : null;
+        if(el){
+          el.classList.remove('over');
+          el.classList.remove('drop-target');
+        }
+      });
+
+      peopleListEl.addEventListener('drop', function(e){
+        if(dragGroupName){
+          var header = e.target.closest ? e.target.closest('.group-header') : null;
+          if(!header) return;
+          e.preventDefault();
+          var sourceName = dragGroupName;
+          var targetName = header.getAttribute('data-group');
+          clearDropHighlight();
+          dragGroupName = null;
+          if(sourceName && targetName && sourceName !== targetName){
+            reorderGroupBefore(sourceName, targetName);
+          }
+          return;
+        }
+        var block = e.target.closest ? e.target.closest('.group-block') : null;
+        if(!block) return;
+        e.preventDefault();
+        clearDropHighlight();
+        var idx = dragIndex;
+        if(idx === null && e.dataTransfer){
+          var rawIdx = e.dataTransfer.getData('text/plain');
+          if(rawIdx !== '' && rawIdx.indexOf('group:') !== 0) idx = Number(rawIdx);
+        }
+        dragIndex = null;
+        if(idx === null || isNaN(idx)) return;
+        assignPersonToGroup(idx, block.getAttribute('data-group'));
+      });
+      document.getElementById('grid-body').addEventListener('click', function(e){
+        var btn = e.target.closest ? e.target.closest('[data-action="empty-import"]') : null;
+        if(btn){ openImportModal(); return; }
+        var cell = e.target.closest ? e.target.closest('td.slot') : null;
+        if(!cell) return;
+        var day = Number(cell.getAttribute('data-day'));
+        var period = Number(cell.getAttribute('data-period'));
+        if(day && period) openRoster(day, period);
+      });
+      document.getElementById('win-min').addEventListener('click', function(){ if(isDesktop()) window.pywebview.api.minimize(); });
+      document.getElementById('win-max').addEventListener('click', function(){ if(isDesktop()) window.pywebview.api.maximize(); });
+      document.getElementById('win-close').addEventListener('click', function(){ if(isDesktop()) window.pywebview.api.close(); });
+
+      populateWeekSelect();
+      loadAppInfo();
+      loadPeople().then(function(){
+        populateSemesterSelect();
+        populateGroupSelect();
+        refreshGroupOptions();
+        populateGroupTarget();
+        resetSelection();
+        renderAll();
+        refreshIfNeeded();
+      });
+    })();
+  </script>
+</body>
+</html>
+
+
+

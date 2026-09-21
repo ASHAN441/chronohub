@@ -1,0 +1,970 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SYNUTV · 界面演示</title>
+<style>
+  :root{ color-scheme: light dark; }
+  html, body{ margin:0; height:100%; }
+  body{
+    --win-bg:#f3f3f3;
+    --win-surface:#ffffff;
+    --win-surface-2:#f9f9f9;
+    --win-surface-3:#ebebeb;
+    --win-text:#1b1b1b;
+    --win-text-muted:#5f5f5f;
+    --win-border:#d9d9d9;
+    --win-accent:#0078d4;
+    --win-accent-fg:#ffffff;
+    --win-free:#107c10;
+    --win-warn:#9d5d00;
+    --win-bg: light-dark(#f3f3f3, #202020);
+    --win-surface: light-dark(#ffffff, #2b2b2b);
+    --win-surface-2: light-dark(#f9f9f9, #323232);
+    --win-surface-3: light-dark(#ebebeb, #3a3a3a);
+    --win-text: light-dark(#1b1b1b, #f0f0f0);
+    --win-text-muted: light-dark(#5f5f5f, #b0b0b0);
+    --win-border: light-dark(#d9d9d9, #3a3a3a);
+    --win-accent: light-dark(#0078d4, #4cc2ff);
+    --win-accent-fg: light-dark(#ffffff, #0b1b2b);
+    --win-free: light-dark(#107c10, #6ccb5f);
+    --win-warn: light-dark(#9d5d00, #ffd180);
+    --win-accent-soft: color-mix(in srgb, var(--win-accent) 13%, var(--win-surface));
+    font-family:"Segoe UI","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+    color:var(--win-text); background:var(--win-bg);
+    font-size:13px; line-height:1.45;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  *,*::before,*::after{ box-sizing:border-box; }
+
+  /* ---------- 标题栏 ---------- */
+  .win-titlebar{ display:flex; align-items:stretch; height:36px; flex:none; background:var(--win-surface); border-bottom:1px solid var(--win-border); user-select:none; }
+  .win-titlebar-left{ display:flex; align-items:center; gap:9px; padding-left:12px; min-width:0; }
+  .win-logo{ width:18px; height:18px; border-radius:4px; background:var(--win-accent); color:var(--win-accent-fg); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; }
+  .win-title{ font-size:12px; color:var(--win-text-muted); white-space:nowrap; }
+  .demo-flag{ font-size:11px; color:var(--win-warn); background:color-mix(in srgb, var(--win-warn) 14%, var(--win-surface)); border:1px solid color-mix(in srgb, var(--win-warn) 40%, var(--win-border)); padding:0 7px; border-radius:999px; }
+  .win-controls{ margin-left:auto; display:flex; flex:none; }
+  .win-controls button{ width:46px; height:36px; border:none; background:transparent; color:var(--win-text); font-family:inherit; font-size:12px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .win-controls button:hover{ background:var(--win-surface-3); }
+  .win-controls .win-close:hover{ background:#e81123; color:#fff; }
+
+  /* ---------- 外壳：导航栏 + 内容区 ---------- */
+  .shell{ display:flex; flex:1; min-height:0; }
+  .rail{ width:76px; flex:none; background:var(--win-surface); border-right:1px solid var(--win-border); padding:8px 6px; display:flex; flex-direction:column; gap:4px; }
+  .rail-item{ display:flex; flex-direction:column; align-items:center; gap:4px; padding:9px 2px 7px; border:none; background:transparent; color:var(--win-text); font-family:inherit; font-size:11px; border-radius:6px; cursor:pointer; position:relative; }
+  .rail-item svg{ width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+  .rail-item:hover{ background:var(--win-surface-3); }
+  .rail-item.active{ background:var(--win-accent-soft); color:var(--win-accent); font-weight:600; }
+  .rail-item.active::before{ content:""; position:absolute; left:-6px; top:50%; transform:translateY(-50%); width:3px; height:20px; border-radius:0 2px 2px 0; background:var(--win-accent); }
+  .rail-badge{ position:absolute; top:4px; right:12px; min-width:16px; height:16px; padding:0 4px; border-radius:8px; background:var(--win-accent); color:var(--win-accent-fg); font-size:10px; font-weight:600; line-height:16px; text-align:center; }
+  .rail-spacer{ flex:1; }
+
+  .view-wrap{ flex:1; min-width:0; display:flex; flex-direction:column; }
+  .view{ flex:1; min-height:0; display:none; flex-direction:column; }
+  .view.active{ display:flex; }
+
+  /* ---------- 通用控件 ---------- */
+  .win-toolbar{ display:flex; align-items:center; gap:8px; padding:8px 12px; flex:none; background:var(--win-surface); border-bottom:1px solid var(--win-border); flex-wrap:wrap; }
+  .tb-btn{ display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 11px; border:1px solid transparent; border-radius:5px; background:transparent; color:var(--win-text); font-family:inherit; font-size:13px; cursor:pointer; }
+  .tb-btn:hover{ background:var(--win-surface-3); }
+  .tb-btn.primary{ background:var(--win-accent); color:var(--win-accent-fg); }
+  .tb-btn.primary:hover{ background:color-mix(in srgb, var(--win-accent) 88%, #000); }
+  .tb-btn.outline{ border-color:var(--win-border); background:var(--win-surface-2); }
+  .tb-btn.outline:hover{ background:var(--win-surface-3); }
+  .tb-btn:disabled{ opacity:.5; cursor:not-allowed; }
+  .tb-sep{ width:1px; height:20px; background:var(--win-border); margin:0 2px; }
+  .tb-field{ display:inline-flex; align-items:center; gap:7px; color:var(--win-text-muted); font-size:12px; }
+  .tb-select{ font-family:inherit; font-size:13px; height:30px; padding:0 8px; border-radius:5px; border:1px solid var(--win-border); background:var(--win-surface); color:var(--win-text); }
+  .tb-spacer{ flex:1; }
+  .tb-info{ font-size:12px; color:var(--win-text-muted); }
+  .tb-info strong{ color:var(--win-text); font-weight:600; }
+  .win-input{ font-family:inherit; font-size:13px; height:32px; padding:0 10px; border-radius:5px; border:1px solid var(--win-border); background:var(--win-surface); color:var(--win-text); }
+  .win-field-label{ font-size:12px; color:var(--win-text-muted); }
+
+  /* ---------- 页面：账号管理 ---------- */
+  .acct-body{ flex:1; min-height:0; display:flex; }
+  .acct-list-wrap{ flex:1; min-width:0; overflow:auto; padding:12px; }
+  .acct-card{ display:flex; align-items:center; gap:12px; padding:11px 13px; border:1px solid var(--win-border); border-radius:8px; background:var(--win-surface); margin-bottom:8px; cursor:pointer; }
+  .acct-card:hover{ border-color:color-mix(in srgb, var(--win-accent) 45%, var(--win-border)); background:var(--win-surface-2); }
+  .acct-card.sel{ border-color:var(--win-accent); background:var(--win-accent-soft); }
+  .acct-avatar{ width:36px; height:36px; border-radius:50%; background:var(--win-accent-soft); color:var(--win-accent); display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:600; flex:none; }
+  .acct-main{ flex:1; min-width:0; }
+  .acct-name{ font-size:14px; font-weight:600; display:flex; align-items:center; gap:6px; }
+  .acct-star{ color:var(--win-free); font-size:12px; }
+  .acct-sub{ font-size:12px; color:var(--win-text-muted); margin-top:2px; display:flex; gap:10px; flex-wrap:wrap; }
+  .acct-notes{ font-size:11px; color:var(--win-text-muted); background:var(--win-surface-3); padding:0 6px; border-radius:4px; }
+  .chip{ font-size:11px; padding:1px 8px; border-radius:999px; border:1px solid transparent; white-space:nowrap; }
+  .chip.ok{ color:var(--win-free); background:color-mix(in srgb, var(--win-free) 13%, var(--win-surface)); border-color:color-mix(in srgb, var(--win-free) 38%, var(--win-border)); }
+  .chip.no{ color:var(--win-text-muted); background:var(--win-surface-3); border-color:var(--win-border); }
+  .chip.wait{ color:var(--win-warn); background:color-mix(in srgb, var(--win-warn) 13%, var(--win-surface)); border-color:color-mix(in srgb, var(--win-warn) 38%, var(--win-border)); }
+  .acct-acts{ display:flex; gap:6px; flex:none; }
+  .icon-btn{ height:26px; padding:0 9px; font-size:12px; font-family:inherit; border:1px solid var(--win-border); border-radius:5px; background:var(--win-surface-2); color:var(--win-text); cursor:pointer; }
+  .icon-btn:hover{ background:var(--win-surface-3); }
+  .icon-btn.danger:hover{ color:#c42b1c; border-color:color-mix(in srgb, #c42b1c 45%, var(--win-border)); background:color-mix(in srgb, #c42b1c 10%, var(--win-surface)); }
+  .acct-side{ width:268px; flex:none; border-left:1px solid var(--win-border); background:var(--win-surface); padding:14px; overflow:auto; }
+  .side-title{ font-size:12px; font-weight:600; margin-bottom:8px; }
+  .side-kv{ display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:5px 0; border-bottom:1px dashed var(--win-border); }
+  .side-kv span:first-child{ color:var(--win-text-muted); }
+  .flow-card{ margin-top:14px; border:1px solid var(--win-border); border-radius:8px; padding:11px; background:var(--win-surface-2); }
+  .flow-title{ font-size:12px; font-weight:600; margin-bottom:7px; }
+  .flow-step{ display:flex; gap:8px; font-size:12px; color:var(--win-text-muted); padding:3px 0; align-items:flex-start; }
+  .flow-num{ width:16px; height:16px; flex:none; border-radius:50%; background:var(--win-accent-soft); color:var(--win-accent); font-size:10px; line-height:16px; text-align:center; font-weight:600; }
+
+  /* ---------- 页面：课表导出（内嵌浏览器） ---------- */
+  .browser-body{ flex:1; min-height:0; display:flex; flex-direction:column; padding:12px; gap:10px; }
+  .mock-win{ flex:1; min-height:0; display:flex; flex-direction:column; border:1px solid var(--win-border); border-radius:8px; overflow:hidden; background:var(--win-surface); }
+  .mock-bar{ display:flex; align-items:center; gap:6px; padding:7px 9px; border-bottom:1px solid var(--win-border); background:var(--win-surface-2); }
+  .mock-nav{ width:28px; height:28px; border:1px solid var(--win-border); border-radius:5px; background:var(--win-surface); color:var(--win-text-muted); cursor:pointer; font-size:13px; line-height:1; display:flex; align-items:center; justify-content:center; }
+  .mock-url{ flex:1; height:28px; border:1px solid var(--win-border); border-radius:5px; background:var(--win-surface); color:var(--win-text-muted); font-size:12px; padding:0 10px; display:flex; align-items:center; gap:7px; overflow:hidden; white-space:nowrap; }
+  .mock-dot{ width:7px; height:7px; border-radius:50%; background:var(--win-free); flex:none; }
+  .mock-page{ flex:1; min-height:0; overflow:auto; background:#f7f9fc; color:#20242b; padding:0; }
+  .mock-page.blank{ display:flex; align-items:center; justify-content:center; background:var(--win-surface); color:var(--win-text-muted); }
+  .jp-head{ background:linear-gradient(90deg,#1552a8,#2f7fd4); color:#fff; padding:14px 20px; display:flex; align-items:center; gap:12px; }
+  .jp-head .jp-logo{ width:34px; height:34px; border-radius:8px; background:rgba(255,255,255,.2); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px; }
+  .jp-head h1{ font-size:16px; margin:0; font-weight:600; }
+  .jp-head p{ margin:2px 0 0; font-size:12px; opacity:.85; }
+  .jp-bar{ background:#fff; border-bottom:1px solid #dde3ea; padding:8px 20px; display:flex; gap:18px; font-size:12.5px; color:#41505f; }
+  .jp-panel{ padding:18px 20px; }
+  .jp-card{ background:#fff; border:1px solid #dde3ea; border-radius:8px; padding:16px; }
+  .jp-card h2{ font-size:14px; margin:0 0 4px; color:#20242b; }
+  .jp-card .hint{ font-size:12px; color:#6b7885; margin-bottom:14px; }
+  .jp-table{ width:100%; border-collapse:collapse; font-size:12px; }
+  .jp-table th,.jp-table td{ border:1px solid #e2e7ed; padding:6px 8px; text-align:center; color:#31404e; }
+  .jp-table th{ background:#f2f6fa; color:#54637a; font-weight:500; }
+  .jp-table td.course{ background:#eaf3fd; color:#1552a8; font-weight:500; }
+  .jp-actions{ display:flex; align-items:center; gap:12px; margin-top:16px; }
+  .jp-export{ height:36px; padding:0 18px; border:none; border-radius:6px; background:#c8161d; color:#fff; font-size:13.5px; font-weight:600; font-family:inherit; cursor:pointer; }
+  .jp-export:hover{ background:#a8121a; }
+  .jp-export:disabled{ background:#c9cdd3; cursor:not-allowed; }
+  .jp-note{ font-size:12px; color:#6b7885; }
+  .import-card{ flex:none; border:1px solid var(--win-border); border-radius:8px; background:var(--win-surface); padding:11px 13px; display:flex; align-items:center; gap:12px; }
+  .import-card .ic-title{ font-size:13px; font-weight:600; }
+  .import-card .ic-sub{ font-size:12px; color:var(--win-text-muted); margin-top:2px; }
+  .import-card .ic-arrow{ font-size:16px; color:var(--win-text-muted); }
+
+  /* ---------- 页面：空课表统计 ---------- */
+  .win-body{ display:flex; align-items:stretch; flex:1; min-height:0; }
+  .win-sidebar{ width:224px; flex:none; border-right:1px solid var(--win-border); background:var(--win-surface); padding:12px 10px; overflow-y:auto; }
+  .win-sidebar-title{ font-size:12px; font-weight:600; padding:0 6px; }
+  .win-sidebar-sub{ font-size:11px; color:var(--win-text-muted); padding:2px 6px 10px; }
+  .win-sidebar-actions{ display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:0 6px 10px; }
+  .win-sidebar-actions .tb-btn{ height:30px; justify-content:center; padding:0 6px; font-size:12px; border:1px solid var(--win-border); border-radius:6px; background:var(--win-surface-2); }
+  .win-sidebar-actions .tb-btn:hover{ background:var(--win-surface-3); }
+  .win-sidebar-actions .tb-btn.danger{ grid-column:1 / -1; color:light-dark(#c42b1c,#ff9aa2); }
+  .win-sidebar-search{ display:flex; gap:6px; padding:0 6px 8px; }
+  .win-sidebar-search .win-input{ height:28px; font-size:12px; flex:1; min-width:0; }
+  .win-people-list{ display:flex; flex-direction:column; gap:2px; }
+  .group-header{ font-size:11px; font-weight:600; color:var(--win-text-muted); padding:9px 6px 4px; }
+  .person-item{ display:flex; align-items:center; gap:8px; padding:6px; border-radius:5px; cursor:pointer; }
+  .person-item:hover{ background:var(--win-surface-3); }
+  .person-check{ accent-color:var(--win-accent); }
+  .person-avatar{ width:24px; height:24px; border-radius:50%; background:var(--win-accent-soft); color:var(--win-accent); display:flex; align-items:center; justify-content:center; font-size:12px; flex:none; }
+  .person-info{ display:flex; flex-direction:column; min-width:0; }
+  .person-name{ font-size:13px; }
+  .person-major{ font-size:11px; color:var(--win-text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .win-main{ flex:1; min-width:0; padding:12px; display:flex; flex-direction:column; }
+  .win-grid-wrap{ flex:1; min-height:0; overflow:auto; border:1px solid var(--win-border); border-radius:6px; background:var(--win-border); }
+  .win-grid{ width:100%; border-collapse:separate; border-spacing:1px; min-width:760px; table-layout:fixed; }
+  .win-grid th,.win-grid td{ background:var(--win-surface); }
+  .win-grid th{ padding:7px; font-size:12px; font-weight:600; color:var(--win-text-muted); text-align:center; }
+  .win-grid .group-row td{ padding:3px 10px; font-size:11px; color:var(--win-text-muted); background:var(--win-surface-3); text-align:left; }
+  .win-grid .period-cell{ text-align:center; font-size:12px; color:var(--win-text-muted); width:50px; }
+  .win-grid .slot{ padding:5px 8px; font-size:12px; vertical-align:middle; text-align:center; min-width:92px; cursor:pointer; }
+  .win-grid .slot:hover{ outline:1px solid var(--win-accent); outline-offset:-1px; }
+  .win-grid .slot.none{ background:var(--win-surface-2); }
+  .win-grid .slot.some{ background:color-mix(in srgb, var(--win-free) var(--mix,40%), var(--win-surface)); }
+  .win-grid .slot.full{ background:color-mix(in srgb, var(--win-free) var(--mix,100%), var(--win-surface)); }
+  .win-grid .slot .cell-big{ font-size:15px; font-weight:600; line-height:1.25; }
+  .win-grid .slot .cell-sub{ font-size:11px; color:var(--win-text-muted); }
+  .win-legend{ display:flex; align-items:center; gap:14px; margin-top:9px; font-size:12px; color:var(--win-text-muted); flex-wrap:wrap; flex:none; }
+  .win-legend-item{ display:inline-flex; align-items:center; gap:6px; }
+  .win-legend-dot{ width:10px; height:10px; border-radius:2px; }
+  .win-legend-dot.none{ background:var(--win-surface-2); border:1px solid var(--win-border); }
+  .win-legend-dot.some{ background:color-mix(in srgb, var(--win-free) 32%, var(--win-surface)); border:1px solid var(--win-free); }
+  .win-legend-dot.full{ background:color-mix(in srgb, var(--win-free) 24%, var(--win-surface)); border:1px solid var(--win-free); }
+  .win-legend-note{ margin-left:auto; }
+
+  /* ---------- 页面：关于 ---------- */
+  .about-view{ flex:1; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .about-box{ text-align:center; max-width:520px; }
+  .about-logo{ width:64px; height:64px; border-radius:16px; background:var(--win-accent); color:var(--win-accent-fg); display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:600; margin:0 auto 14px; }
+  .about-name{ font-size:20px; font-weight:600; }
+  .about-version{ font-size:13px; color:var(--win-text-muted); margin-top:4px; }
+  .about-note{ font-size:12.5px; color:var(--win-text-muted); margin-top:16px; line-height:1.8; }
+  .about-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:18px; text-align:left; }
+  .about-cell{ border:1px solid var(--win-border); border-radius:8px; padding:10px 12px; background:var(--win-surface); }
+  .about-cell b{ display:block; font-size:12px; margin-bottom:3px; }
+  .about-cell span{ font-size:12px; color:var(--win-text-muted); }
+
+  /* ---------- 状态栏 / 浮层 ---------- */
+  .win-statusbar{ display:flex; align-items:center; gap:16px; height:26px; padding:0 10px; flex:none; background:var(--win-surface); border-top:1px solid var(--win-border); font-size:11px; color:var(--win-text-muted); }
+  .win-statusbar strong{ color:var(--win-text); font-weight:600; }
+  .win-toast{ position:absolute; left:50%; bottom:44px; transform:translateX(-50%); padding:9px 14px; border-radius:6px; background:var(--win-surface); border:1px solid var(--win-border); box-shadow:0 4px 14px rgba(0,0,0,.18); font-size:13px; z-index:30; display:flex; align-items:center; gap:10px; }
+  .win-toast[hidden]{ display:none; }
+  .win-toast button{ font-family:inherit; font-size:12px; border:1px solid var(--win-border); background:var(--win-surface-2); color:var(--win-text); border-radius:5px; padding:3px 9px; cursor:pointer; }
+  .win-progress{ position:absolute; left:50%; bottom:44px; transform:translateX(-50%); width:460px; max-width:82%; padding:11px 14px; border-radius:6px; background:var(--win-surface); border:1px solid var(--win-border); box-shadow:0 4px 14px rgba(0,0,0,.18); z-index:32; }
+  .win-progress[hidden]{ display:none; }
+  .win-progress-head{ display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px; }
+  .win-progress-track{ height:8px; border-radius:4px; background:rgba(127,127,127,.22); overflow:hidden; }
+  .win-progress-fill{ height:100%; width:0; background:var(--win-accent); transition:width .18s ease; }
+  .win-progress-note{ margin-top:6px; font-size:12px; color:var(--win-text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  .win-modal{ position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; }
+  .win-modal[hidden]{ display:none; }
+  .win-modal-backdrop{ position:absolute; inset:0; background:rgba(0,0,0,.4); }
+  .win-modal-card{ position:relative; width:420px; max-width:92vw; background:var(--win-surface); border:1px solid var(--win-border); border-radius:10px; box-shadow:0 12px 32px rgba(0,0,0,.3); overflow:hidden; }
+  .win-modal-card.wide{ width:520px; }
+  .win-modal-head{ display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--win-border); font-weight:500; }
+  .win-modal-close{ border:none; background:transparent; color:var(--win-text-muted); cursor:pointer; font-size:14px; padding:2px 7px; border-radius:4px; }
+  .win-modal-close:hover{ color:var(--win-text); background:var(--win-surface-3); }
+  .win-modal-body{ padding:14px; display:flex; flex-direction:column; gap:10px; }
+  .win-modal-foot{ display:flex; justify-content:flex-end; gap:8px; padding:0 14px 14px; }
+  .roster-list{ max-height:340px; overflow-y:auto; border:1px solid var(--win-border); border-radius:6px; }
+  .roster-item{ display:flex; align-items:center; gap:8px; padding:7px 10px; border-bottom:1px solid var(--win-border); font-size:13px; }
+  .roster-item:last-child{ border-bottom:none; }
+  .roster-name{ min-width:76px; }
+  .roster-meta{ color:var(--win-text-muted); font-size:12px; }
+  .roster-group{ margin-left:auto; color:var(--win-text-muted); font-size:12px; }
+</style>
+</head>
+<body>
+
+<div class="win-titlebar">
+  <div class="win-titlebar-left">
+    <span class="win-logo">S</span>
+    <span class="win-title">SYNUTV</span>
+    <span class="demo-flag">界面演示 · 数据为模拟</span>
+  </div>
+  <div class="win-controls">
+    <button type="button" aria-label="最小化">─</button>
+    <button type="button" aria-label="最大化">□</button>
+    <button type="button" class="win-close" aria-label="关闭">✕</button>
+  </div>
+</div>
+
+<div class="shell">
+  <nav class="rail">
+    <button class="rail-item active" data-view="accounts" type="button">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-3.6 3.4-6.2 7.5-6.2s7.5 2.6 7.5 6.2"/></svg>
+      账号
+      <span class="rail-badge" id="rail-acct-badge">5</span>
+    </button>
+    <button class="rail-item" data-view="browser" type="button">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2.2"/><path d="M3 9h18"/><path d="M7 6.7h.01M9.6 6.7h.01"/></svg>
+      课表导出
+    </button>
+    <button class="rail-item" data-view="freetime" type="button">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.2"/><path d="M3 9.5h18M9 9.5V20.5M15 9.5V20.5"/></svg>
+      空课表
+      <span class="rail-badge" id="rail-people-badge">3</span>
+    </button>
+    <span class="rail-spacer"></span>
+    <button class="rail-item" data-view="about" type="button">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.2M12 8.1h.01"/></svg>
+      关于
+    </button>
+  </nav>
+
+  <div class="view-wrap">
+
+    <!-- ============ 账号管理 ============ -->
+    <section class="view active" id="view-accounts">
+      <div class="win-toolbar">
+        <button class="tb-btn primary" id="acct-add" type="button">＋ 新增账号</button>
+        <button class="tb-btn outline" id="acct-import" type="button">导入 CSV</button>
+        <button class="tb-btn outline" id="acct-export" type="button">导出 CSV</button>
+        <span class="tb-sep"></span>
+        <input class="win-input" id="acct-search" placeholder="搜索昵称 / 学号 / 备注" style="width:230px;height:30px;">
+        <span class="tb-spacer"></span>
+        <span class="tb-info" id="acct-count"></span>
+      </div>
+      <div class="acct-body">
+        <div class="acct-list-wrap" id="acct-list"></div>
+        <aside class="acct-side">
+          <div class="side-title">当前账号</div>
+          <div id="acct-detail"></div>
+          <div class="flow-card">
+            <div class="flow-title">合并后的完整流程</div>
+            <div class="flow-step"><span class="flow-num">1</span><span>在「账号」里存好教务系统账号，密码用 DPAPI 加密</span></div>
+            <div class="flow-step"><span class="flow-num">2</span><span>「课表导出」一键登录并导出课表 PDF</span></div>
+            <div class="flow-step"><span class="flow-num">3</span><span>PDF <b>自动解析入库</b>，无需再手动选文件</span></div>
+            <div class="flow-step"><span class="flow-num">4</span><span>到「空课表」勾选人员，看共同空闲时间</span></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ 课表导出 ============ -->
+    <section class="view" id="view-browser">
+      <div class="win-toolbar">
+        <label class="tb-field">账号
+          <select class="tb-select" id="browser-account"></select>
+        </label>
+        <label class="tb-field">系统地址
+          <select class="tb-select" id="browser-url">
+            <option>外网 · jwxt.synu.edu.cn</option>
+            <option>内网 · 192.168.186.200</option>
+          </select>
+        </label>
+        <button class="tb-btn primary" id="browser-login" type="button">打开并登录</button>
+        <span class="tb-sep"></span>
+        <button class="tb-btn outline" id="browser-logout" type="button">清除登录状态</button>
+        <span class="tb-spacer"></span>
+        <span class="tb-info" id="browser-hint">尚未登录</span>
+      </div>
+      <div class="browser-body">
+        <div class="mock-win">
+          <div class="mock-bar">
+            <button class="mock-nav" type="button">‹</button>
+            <button class="mock-nav" type="button">›</button>
+            <button class="mock-nav" type="button">⟳</button>
+            <span class="mock-url"><span class="mock-dot" id="url-dot"></span><span id="mock-url-text">about:blank</span></span>
+          </div>
+          <div class="mock-page blank" id="mock-page">
+            <div style="text-align:center">
+              <div style="font-size:15px;font-weight:500;color:var(--win-text);margin-bottom:6px">内嵌浏览器已就绪</div>
+              <div style="font-size:12.5px">选择账号后点「打开并登录」，将自动填入用户名密码并提交</div>
+            </div>
+          </div>
+        </div>
+        <div class="import-card" id="import-card">
+          <span class="ic-arrow">↳</span>
+          <div>
+            <div class="ic-title">导出后自动入库</div>
+            <div class="ic-sub" id="import-card-sub">导出的课表 PDF 会直接解析并合并进「空课表」，不需要再手动选文件。</div>
+          </div>
+          <span class="tb-spacer"></span>
+          <button class="tb-btn outline" id="goto-freetime" type="button">去看空课表</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 空课表统计 ============ -->
+    <section class="view" id="view-freetime">
+      <div class="win-toolbar">
+        <button class="tb-btn primary" id="ft-import" type="button">导入课表</button>
+        <button class="tb-btn outline" id="ft-export" type="button">导出结果</button>
+        <span class="tb-sep"></span>
+        <label class="tb-field">学期
+          <select class="tb-select" id="ft-semester"></select>
+        </label>
+        <label class="tb-field">分组
+          <select class="tb-select" id="ft-group"></select>
+        </label>
+        <label class="tb-field">周次
+          <select class="tb-select" id="ft-week"></select>
+        </label>
+        <span class="tb-spacer"></span>
+        <span class="tb-info" id="ft-count"></span>
+      </div>
+      <div class="win-body">
+        <aside class="win-sidebar">
+          <div class="win-sidebar-title">人员分组</div>
+          <div class="win-sidebar-sub">勾选后纳入统计</div>
+          <div class="win-sidebar-actions">
+            <button class="tb-btn" type="button">＋ 新建分组</button>
+            <button class="tb-btn" type="button">批量分组</button>
+          </div>
+          <div class="win-sidebar-search">
+            <input class="win-input" id="ft-search" placeholder="搜索姓名/学号">
+          </div>
+          <div class="win-people-list" id="ft-people"></div>
+        </aside>
+        <main class="win-main">
+          <div class="win-grid-wrap">
+            <table class="win-grid">
+              <thead><tr><th class="period-cell">节次</th><th>周一</th><th>周二</th><th>周三</th><th>周四</th><th>周五</th><th>周六</th><th>周日</th></tr></thead>
+              <tbody id="ft-grid"></tbody>
+            </table>
+          </div>
+          <div class="win-legend">
+            <span class="win-legend-item"><span class="win-legend-dot none"></span>全员有课</span>
+            <span class="win-legend-item"><span class="win-legend-dot some"></span>部分人有空</span>
+            <span class="win-legend-item"><span class="win-legend-dot full"></span>全员有空</span>
+            <span class="win-legend-note">颜色越深，空闲人数越多 · 点格子看具体名单</span>
+          </div>
+        </main>
+      </div>
+    </section>
+
+    <!-- ============ 关于 ============ -->
+    <section class="view" id="view-about">
+      <div class="about-view">
+        <div class="about-box">
+          <div class="about-logo">S</div>
+          <div class="about-name">SYNUTV</div>
+          <div class="about-version">v3.0 · 由「教务系统管理器 v1.0.0」与「多人空课表 v2.1」合并</div>
+          <div class="about-note">
+            一个应用管完全程：账号管理 → 自动登录 → 导出课表 → 解析入库 → 多人空闲统计。<br>
+            开发者：阿山 · ashan441@163.com · © 2026 阿山
+          </div>
+          <div class="about-grid">
+            <div class="about-cell"><b>账号与安全</b><span>SQLite 存储，密码经 Windows DPAPI 加密，仅当前 Windows 用户可解密</span></div>
+            <div class="about-cell"><b>课表解析</b><span>支持网格版式与列表版式两种 PDF，自动展开单双周与周次区间</span></div>
+            <div class="about-cell"><b>本地优先</b><span>全部数据存在本地 data/ 目录，不上传任何服务器</span></div>
+            <div class="about-cell"><b>内嵌浏览器</b><span>Chromium 内核，自动登录与导出课表都在应用窗口内完成</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<div class="win-statusbar">
+  <span id="st-left">就绪</span>
+  <span style="margin-left:auto" id="st-right"></span>
+</div>
+
+<div class="win-toast" id="toast" hidden></div>
+
+<div class="win-progress" id="progress" hidden>
+  <div class="win-progress-head"><span id="progress-title">正在识别课表…</span><span id="progress-count"></span></div>
+  <div class="win-progress-track"><div class="win-progress-fill" id="progress-fill"></div></div>
+  <div class="win-progress-note" id="progress-note"></div>
+</div>
+
+<div class="win-modal" id="roster-modal" hidden>
+  <div class="win-modal-backdrop" data-close="roster"></div>
+  <div class="win-modal-card wide">
+    <div class="win-modal-head"><span id="roster-title">空闲名单</span><button class="win-modal-close" data-close="roster" type="button">✕</button></div>
+    <div class="win-modal-body">
+      <div class="win-field-label" id="roster-sub"></div>
+      <div class="roster-list" id="roster-list"></div>
+    </div>
+    <div class="win-modal-foot"><button class="tb-btn outline" data-close="roster" type="button">关闭</button></div>
+  </div>
+</div>
+
+<div class="win-modal" id="acct-modal" hidden>
+  <div class="win-modal-backdrop" data-close="acct"></div>
+  <div class="win-modal-card">
+    <div class="win-modal-head"><span id="acct-modal-title">新增账号</span><button class="win-modal-close" data-close="acct" type="button">✕</button></div>
+    <div class="win-modal-body">
+      <div><div class="win-field-label" style="margin-bottom:5px">昵称</div><input class="win-input" id="acct-f-nick" style="width:100%" placeholder="例如：张传山"></div>
+      <div><div class="win-field-label" style="margin-bottom:5px">用户名（学号）</div><input class="win-input" id="acct-f-user" style="width:100%" placeholder="例如：2023010105"></div>
+      <div><div class="win-field-label" style="margin-bottom:5px">密码</div><input class="win-input" id="acct-f-pass" type="password" style="width:100%" placeholder="保存时由 DPAPI 加密"></div>
+      <div><div class="win-field-label" style="margin-bottom:5px">备注</div><input class="win-input" id="acct-f-notes" style="width:100%" placeholder="可选，例如：记者部"></div>
+    </div>
+    <div class="win-modal-foot">
+      <button class="tb-btn outline" data-close="acct" type="button">取消</button>
+      <button class="tb-btn primary" id="acct-save" type="button">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   模拟数据（真实实现里由 Python 侧提供）
+   ========================================================= */
+var DAYS = ['周一','周二','周三','周四','周五','周六','周日'];
+var PERIOD_GROUPS = [{label:'上午',from:1,to:4},{label:'下午',from:5,to:8},{label:'晚上',from:9,to:11}];
+
+function wk(from, to, parity){
+  var out = [];
+  for(var i=from;i<=to;i++){
+    if(parity==='odd' && i%2===0) continue;
+    if(parity==='even' && i%2!==0) continue;
+    out.push(i);
+  }
+  return out;
+}
+function c(name, day, start, end, weeks, location, teacher){
+  return {name:name, day:day, start:start, end:end, weeks:weeks, location:location||'', teacher:teacher||''};
+}
+
+var ACCOUNTS = [
+  {id:1, nickname:'张传山', username:'2023010101', notes:'学生会',  active:true,  imported:false},
+  {id:2, nickname:'李明',   username:'2023010102', notes:'学生会',  active:false, imported:true},
+  {id:3, nickname:'王雨欣', username:'2023010103', notes:'记者部',  active:false, imported:true},
+  {id:4, nickname:'赵子豪', username:'2023010104', notes:'记者部',  active:false, imported:true},
+  {id:5, nickname:'陈静',   username:'2023010105', notes:'',        active:false, imported:false}
+];
+
+var PEOPLE = [
+  {name:'李明', student_id:'2023010102', semester:'2025-2026-1', group:'学生会', major:'计算机 2303',
+   courses:[c('高等数学',1,1,2,wk(1,18)),c('大学英语',2,3,4,wk(1,16)),c('数据结构',3,1,2,wk(1,18)),c('体育',4,5,6,wk(1,16)),c('线性代数',5,3,4,wk(1,18))]},
+  {name:'王雨欣', student_id:'2023010103', semester:'2025-2026-1', group:'记者部', major:'软件工程 2301',
+   courses:[c('计算机网络',1,3,4,wk(1,18)),c('高等数学',2,1,2,wk(1,18)),c('操作系统',3,5,6,wk(1,18)),c('大学英语',4,1,2,wk(1,16)),c('毛泽东思想和中国特色社会主义理论体系概论',5,5,6,wk(1,18))]},
+  {name:'赵子豪', student_id:'2023010104', semester:'2025-2026-1', group:'记者部', major:'计算机 2303',
+   courses:[c('数据结构',1,1,2,wk(1,18)),c('数据库原理',2,5,6,wk(1,18)),c('计算机网络',4,3,4,wk(1,18)),c('体育',3,3,4,wk(1,16))]}
+];
+
+var PENDING_PERSON = {name:'张传山', student_id:'2023010101', semester:'2025-2026-1', group:'学生会', major:'软件工程 2301',
+  courses:[c('高等数学',1,1,2,wk(1,18)),c('操作系统',2,3,4,wk(1,18)),c('大学英语',3,3,4,wk(1,16)),c('软件工程',4,1,2,wk(1,18)),c('体育',5,7,8,wk(1,16))]};
+
+/* =========================================================
+   通用状态与工具
+   ========================================================= */
+var state = { view:'accounts', selAccount:1, loggedIn:false, selected:new Set([0,1,2]), semester:'all', group:'all', week:1, search:'' };
+
+function esc(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function initial(name){ return esc((name||'?').slice(0,1)); }
+function personIsBusy(p, day, period, week){
+  return p.courses.some(function(co){ return co.day===day && period>=co.start && period<=co.end && co.weeks.indexOf(week)!==-1; });
+}
+function selectedPeople(){
+  return PEOPLE.filter(function(p,i){ return state.selected.has(i); });
+}
+function freeOf(day, period, week, allWeeks){
+  return selectedPeople().filter(function(p){
+    if(!allWeeks) return !personIsBusy(p, day, period, week);
+    for(var w=1;w<=18;w++){ if(personIsBusy(p,day,period,w)) return false; }
+    return true;
+  });
+}
+function groupNames(){
+  var seen = {}, out = [];
+  PEOPLE.forEach(function(p){ if(p.group && !seen[p.group]){ seen[p.group]=1; out.push(p.group); } });
+  return out;
+}
+function toast(msg, actionLabel, actionFn){
+  var el = document.getElementById('toast');
+  el.innerHTML = '<span>'+msg+'</span>';
+  if(actionLabel){
+    var b = document.createElement('button');
+    b.textContent = actionLabel;
+    b.addEventListener('click', function(){ el.hidden = true; actionFn && actionFn(); });
+    el.appendChild(b);
+  }
+  el.hidden = false;
+  clearTimeout(toast._t);
+  toast._t = setTimeout(function(){ el.hidden = true; }, actionLabel ? 6000 : 2600);
+}
+function progress(done, total, note){
+  var box = document.getElementById('progress');
+  box.hidden = false;
+  document.getElementById('progress-count').textContent = done + ' / ' + total;
+  document.getElementById('progress-fill').style.width = (total ? Math.round(done/total*100) : 0) + '%';
+  document.getElementById('progress-note').textContent = note || '';
+}
+function hideProgress(){ document.getElementById('progress').hidden = true; }
+
+/* =========================================================
+   导航
+   ========================================================= */
+function switchView(name){
+  state.view = name;
+  document.querySelectorAll('.rail-item').forEach(function(b){ b.classList.toggle('active', b.dataset.view===name); });
+  document.querySelectorAll('.view').forEach(function(v){ v.classList.toggle('active', v.id==='view-'+name); });
+  updateStatusbar();
+}
+
+/* =========================================================
+   视图一：账号管理
+   ========================================================= */
+function renderAccounts(){
+  var list = document.getElementById('acct-list');
+  var q = document.getElementById('acct-search').value.trim().toLowerCase();
+  var shown = ACCOUNTS.filter(function(a){
+    if(!q) return true;
+    return (a.nickname+' '+a.username+' '+a.notes).toLowerCase().indexOf(q)!==-1;
+  });
+  list.innerHTML = shown.map(function(a){
+    var chip = a.imported
+      ? '<span class="chip ok">课表已入库</span>'
+      : '<span class="chip no">课表未入库</span>';
+    var star = a.active ? '<span class="acct-star">★ 当前</span>' : '';
+    var notes = a.notes ? '<span class="acct-notes">'+esc(a.notes)+'</span>' : '';
+    return ''+
+      '<div class="acct-card'+(a.id===state.selAccount?' sel':'')+'" data-id="'+a.id+'">'+
+        '<div class="acct-avatar">'+initial(a.nickname)+'</div>'+
+        '<div class="acct-main">'+
+          '<div class="acct-name">'+esc(a.nickname)+star+chip+'</div>'+
+          '<div class="acct-sub"><span>学号 '+esc(a.username)+'</span>'+notes+'</div>'+
+        '</div>'+
+        '<div class="acct-acts">'+
+          '<button class="icon-btn" data-act="active" data-id="'+a.id+'">设为当前</button>'+
+          '<button class="icon-btn" data-act="copy" data-id="'+a.id+'">复制密码</button>'+
+          '<button class="icon-btn danger" data-act="del" data-id="'+a.id+'">删除</button>'+
+        '</div>'+
+      '</div>';
+  }).join('') || '<div style="color:var(--win-text-muted);padding:20px;text-align:center">没有匹配的账号</div>';
+
+  document.getElementById('acct-count').innerHTML = '共 <strong>'+ACCOUNTS.length+'</strong> 个账号';
+  document.getElementById('rail-acct-badge').textContent = ACCOUNTS.length;
+  renderAccountDetail();
+  renderBrowserAccountSelect();
+}
+
+function renderAccountDetail(){
+  var a = ACCOUNTS.filter(function(x){ return x.id===state.selAccount; })[0];
+  var box = document.getElementById('acct-detail');
+  if(!a){ box.innerHTML = '<div style="color:var(--win-text-muted);font-size:12px">未选择账号</div>'; return; }
+  var imported = a.imported ? '已入库' : '未入库';
+  box.innerHTML =
+    '<div style="font-size:15px;font-weight:600;margin-bottom:8px">'+esc(a.nickname)+'</div>'+
+    '<div class="side-kv"><span>学号</span><span>'+esc(a.username)+'</span></div>'+
+    '<div class="side-kv"><span>备注</span><span>'+esc(a.notes||'—')+'</span></div>'+
+    '<div class="side-kv"><span>密码</span><span>DPAPI 加密</span></div>'+
+    '<div class="side-kv"><span>课表状态</span><span>'+imported+'</span></div>'+
+    '<div class="side-kv" style="border-bottom:none"><span>最近使用</span><span>2026-09-21</span></div>';
+}
+
+/* =========================================================
+   视图二：课表导出
+   ========================================================= */
+function renderBrowserAccountSelect(){
+  var sel = document.getElementById('browser-account');
+  var current = sel.value;
+  sel.innerHTML = ACCOUNTS.map(function(a){
+    return '<option value="'+a.id+'">'+esc(a.nickname)+' · '+esc(a.username)+'</option>';
+  }).join('');
+  if(current){ sel.value = current; }
+  if(!sel.value && ACCOUNTS.length){ sel.value = String(state.selAccount); }
+}
+
+function mockLogin(){
+  var acct = ACCOUNTS.filter(function(a){ return String(a.id)===document.getElementById('browser-account').value; })[0];
+  if(!acct){ toast('请先选择一个账号'); return; }
+  var url = document.getElementById('browser-url').value.indexOf('内网')===0
+    ? 'http://192.168.186.200/jwglxt/xtqk/...' : 'http://jwxt.synu.edu.cn/jwglxt/...';
+  document.getElementById('browser-hint').textContent = '登录中…';
+  document.getElementById('mock-page').className = 'mock-page blank';
+  document.getElementById('mock-page').innerHTML = '<div style="font-size:12.5px">正在载入登录页并自动填写账号…</div>';
+  document.getElementById('mock-url-text').textContent = 'http://jwxt.synu.edu.cn/jwglxt/xtgl/login_slogin.html';
+  document.getElementById('url-dot').style.background = 'var(--win-text-muted)';
+
+  setTimeout(function(){
+    document.getElementById('url-dot').style.background = 'var(--win-free)';
+    document.getElementById('browser-hint').innerHTML = '已登录：<strong>'+esc(acct.nickname)+'</strong>';
+    renderMockTimetable(acct);
+    toast('已登录教务系统');
+  }, 900);
+}
+
+function renderMockTimetable(acct){
+  var person = acct.imported ? PEOPLE.filter(function(p){ return p.student_id===acct.username; })[0] : PENDING_PERSON;
+  var courses = (person && person.courses) || [];
+  var cellMap = {};
+  courses.forEach(function(co){
+    for(var d=co.day; d<=co.day; d++){
+      for(var p=co.start; p<=co.end; p++){ cellMap[d+'-'+p] = co.name; }
+    }
+  });
+  var rows = '';
+  for(var p=1;p<=8;p++){
+    rows += '<tr><th>第'+p+'节</th>';
+    for(var d=1; d<=5; d++){
+      var name = cellMap[d+'-'+p];
+      rows += name ? '<td class="course">'+esc(name)+'</td>' : '<td></td>';
+    }
+    rows += '</tr>';
+  }
+  document.getElementById('mock-url-text').textContent = 'http://jwxt.synu.edu.cn/jwglxt/kbcx/xskbcx_cxXskbcxIndex.html';
+  document.getElementById('mock-page').className = 'mock-page';
+  document.getElementById('mock-page').innerHTML =
+    '<div class="jp-head"><div class="jp-logo">教</div>'+
+      '<div><h1>沈阳师范大学 教务管理系统</h1><p>学生课表查询 · '+esc(acct.nickname)+'（'+esc(acct.username)+'）</p></div></div>'+
+    '<div class="jp-bar"><span>首页</span><span>学籍信息</span><span>选课</span><span style="color:#1552a8;font-weight:600">课表查询</span><span>成绩查询</span></div>'+
+    '<div class="jp-panel"><div class="jp-card">'+
+      '<h2>2025-2026 学年第 1 学期 学生课表</h2>'+
+      '<div class="hint">共 '+courses.length+' 门课程。点击下方按钮可把课表导出为 PDF。</div>'+
+      '<table class="jp-table"><thead><tr><th>节次</th><th>周一</th><th>周二</th><th>周三</th><th>周四</th><th>周五</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+      '<div class="jp-actions">'+
+        '<button class="jp-export" id="jp-export">导出课表 PDF</button>'+
+        '<span class="jp-note" id="jp-note">导出后会立即解析并合并进「空课表」</span>'+
+      '</div>'+
+    '</div></div>';
+
+  document.getElementById('jp-export').addEventListener('click', function(){ doExport(acct); });
+}
+
+function doExport(acct){
+  var btn = document.getElementById('jp-export');
+  if(btn) btn.disabled = true;
+  document.getElementById('jp-note').textContent = '正在生成 PDF…';
+
+  setTimeout(function(){
+    progress(0, 4, '保存为 课表.pdf …');
+    var steps = ['解析 PDF 版式（网格格式）…','展开周次 1-18 周…','合并到人员列表…'];
+    var i = 0;
+    var timer = setInterval(function(){
+      i++;
+      progress(i, 4, steps[i-1] || '完成');
+      if(i>=4){
+        clearInterval(timer);
+        setTimeout(function(){
+          hideProgress();
+          acct.imported = true;
+          if(!PEOPLE.some(function(p){ return p.student_id===acct.username; })){
+            PEOPLE.push(PENDING_PERSON);
+            state.selected.add(PEOPLE.length-1);
+          }
+          if(groupNames().indexOf('学生会')===-1){ /* 分组由数据自带 */ }
+          renderAccounts();
+          renderFreetime();
+          document.getElementById('import-card-sub').innerHTML =
+            '已入库：<strong>'+esc(acct.nickname)+'</strong> · '+PENDING_PERSON.courses.length+' 门课程 · 当前共 '+PEOPLE.length+' 人';
+          toast('课表已导出并自动入库：'+acct.nickname, '去空课表看看', function(){ switchView('freetime'); });
+        }, 320);
+      }
+    }, 480);
+  }, 700);
+}
+
+/* =========================================================
+   视图三：空课表统计
+   ========================================================= */
+function populateFreetimeSelects(){
+  var sem = document.getElementById('ft-semester');
+  var sems = {};
+  PEOPLE.forEach(function(p){ if(p.semester) sems[p.semester]=1; });
+  var keys = Object.keys(sems);
+  sem.innerHTML = '<option value="all">全部学期</option>' + keys.map(function(s){ return '<option value="'+esc(s)+'">'+esc(s)+'</option>'; }).join('');
+  sem.value = state.semester;
+
+  var grp = document.getElementById('ft-group');
+  grp.innerHTML = '<option value="all">全部分组</option>' + groupNames().map(function(g){ return '<option value="'+esc(g)+'">'+esc(g)+'</option>'; }).join('');
+  grp.value = state.group;
+  if(!grp.value) { grp.value = 'all'; state.group = 'all'; }
+
+  var w = document.getElementById('ft-week');
+  var opts = ['<option value="all">全程有空</option>'];
+  for(var i=1;i<=18;i++){ opts.push('<option value="'+i+'">第 '+i+' 周</option>'); }
+  w.innerHTML = opts.join('');
+  w.value = state.week==='all' ? 'all' : String(state.week);
+}
+
+function renderPeopleSidebar(){
+  var box = document.getElementById('ft-people');
+  var q = document.getElementById('ft-search').value.trim().toLowerCase();
+  var groups = groupNames().concat(['']);
+  var html = '';
+  groups.forEach(function(g){
+    var members = PEOPLE.map(function(p,i){ return {p:p,i:i}; }).filter(function(o){
+      if((o.p.group||'') !== g) return false;
+      if(state.group!=='all' && (o.p.group||'')!==state.group) return false;
+      if(state.semester!=='all' && o.p.semester!==state.semester) return false;
+      if(q && (o.p.name+' '+o.p.student_id).toLowerCase().indexOf(q)===-1) return false;
+      return true;
+    });
+    if(!members.length) return;
+    html += '<div class="group-header">'+esc(g||'未分组')+'</div>';
+    members.forEach(function(o){
+      html += '<label class="person-item">'+
+        '<input type="checkbox" class="person-check" data-idx="'+o.i+'"'+(state.selected.has(o.i)?' checked':'')+'>'+
+        '<span class="person-avatar">'+initial(o.p.name)+'</span>'+
+        '<span class="person-info"><span class="person-name">'+esc(o.p.name)+'</span>'+
+        '<span class="person-major">'+esc(o.p.major||o.p.student_id)+'</span></span>'+
+      '</label>';
+    });
+  });
+  box.innerHTML = html || '<div style="color:var(--win-text-muted);font-size:12px;padding:8px 6px">没有匹配的人员</div>';
+}
+
+function cellFor(day, period){
+  var sel = selectedPeople();
+  if(!sel.length) return {kind:'none', text:'—'};
+  var allWeeks = state.week==='all';
+  var idx = freeOf(day, period, allWeeks?'':state.week, allWeeks);
+  var label = allWeeks ? '全程空闲' : '空闲';
+  if(!idx.length) return {kind:'none', text: allWeeks ? '无全程空闲' : '全员有课'};
+  if(idx.length===sel.length) return {kind:'full', count:idx.length, names:idx.map(function(p){ return p.name; })};
+  return {kind:'some', count:idx.length, names:idx.map(function(p){ return p.name; })};
+}
+
+function renderFreetimeGrid(){
+  var tbody = document.getElementById('ft-grid');
+  var total = selectedPeople().length;
+  if(!total){
+    tbody.innerHTML = '<tr><td colspan="8" style="height:300px;text-align:center;vertical-align:middle;padding:20px">'+
+      '<div style="font-size:15px;font-weight:500;margin-bottom:6px">还没有选中人员</div>'+
+      '<div style="color:var(--win-text-muted);margin-bottom:14px">在左侧勾选需要一起排时间的人。</div></td></tr>';
+    updateFreetimeStatus();
+    return;
+  }
+  var html = '';
+  PERIOD_GROUPS.forEach(function(g){
+    html += '<tr class="group-row"><td colspan="8">'+g.label+'</td></tr>';
+    for(var p=g.from;p<=g.to;p++){
+      html += '<tr><td class="period-cell">第'+p+'节</td>';
+      for(var d=1;d<=7;d++){
+        var s = cellFor(d, p);
+        var inner = '', style = '';
+        if(s.kind==='none'){
+          inner = '<div class="cell-sub">'+s.text+'</div>';
+        }else{
+          var mix = Math.max(12, Math.round(s.count/total*72));
+          style = ' style="--mix:'+mix+'%"';
+          inner = '<div class="cell-big">'+s.count+'</div><div class="cell-sub">/'+total+'</div>';
+        }
+        html += '<td class="slot '+s.kind+'" data-day="'+d+'" data-period="'+p+'"'+style+'>'+inner+'</td>';
+      }
+      html += '</tr>';
+    }
+  });
+  tbody.innerHTML = html;
+  updateFreetimeStatus();
+}
+
+function updateFreetimeStatus(){
+  var sel = selectedPeople();
+  document.getElementById('ft-count').innerHTML = '已选 <strong>'+sel.length+'</strong> 人 · 共 '+PEOPLE.length+' 人';
+  document.getElementById('rail-people-badge').textContent = PEOPLE.length;
+  if(state.view!=='freetime') return;
+  if(!sel.length){ document.getElementById('st-left').textContent = '请至少勾选一人'; return; }
+  var weekLabel = state.week==='all' ? '全程' : '第 '+state.week+' 周';
+  var best = 0, slots = [];
+  for(var d=1; d<=7; d++){
+    for(var p=1; p<=11; p++){
+      var n = freeOf(d, p, state.week==='all'?'':state.week, state.week==='all').length;
+      if(n>best){ best = n; slots = [DAYS[d-1]+' 第'+p+'节']; }
+      else if(n===best && n>0){ slots.push(DAYS[d-1]+' 第'+p+'节'); }
+    }
+  }
+  var shown = slots.slice(0,3).join('、') + (slots.length>3 ? ' 等' : '');
+  document.getElementById('st-left').innerHTML = best
+    ? '空闲人数最多 <strong>'+best+'</strong> 人（'+shown+'）'
+    : '当前条件下没有空闲时段';
+  document.getElementById('st-right').textContent = weekLabel+' · 已选 '+sel.length+' 人';
+}
+
+function renderFreetime(){
+  populateFreetimeSelects();
+  renderPeopleSidebar();
+  renderFreetimeGrid();
+}
+
+function openRoster(day, period){
+  var allWeeks = state.week==='all';
+  var idx = freeOf(day, period, allWeeks?'':state.week, allWeeks);
+  var total = selectedPeople().length;
+  document.getElementById('roster-title').textContent = DAYS[day-1]+' 第'+period+'节 · 空闲名单';
+  document.getElementById('roster-sub').textContent =
+    (allWeeks ? '全程（1-18 周）' : '第 '+state.week+' 周') + ' · ' + idx.length+' / '+total+' 人空闲';
+  document.getElementById('roster-list').innerHTML = idx.map(function(p){
+    return '<div class="roster-item"><span class="person-avatar">'+initial(p.name)+'</span>'+
+      '<span class="roster-name">'+esc(p.name)+'</span>'+
+      '<span class="roster-meta">'+esc(p.student_id)+'</span>'+
+      '<span class="roster-group">'+esc(p.group||'未分组')+'</span></div>';
+  }).join('') || '<div style="padding:18px;text-align:center;color:var(--win-text-muted)">该时段无人空闲</div>';
+  document.getElementById('roster-modal').hidden = false;
+}
+
+/* =========================================================
+   状态栏
+   ========================================================= */
+function updateStatusbar(){
+  if(state.view==='accounts'){
+    document.getElementById('st-left').textContent = '账号数据保存在本地 data/accounts.db，密码经 DPAPI 加密';
+    document.getElementById('st-right').textContent = '共 '+ACCOUNTS.length+' 个账号';
+  }else if(state.view==='browser'){
+    document.getElementById('st-left').textContent = '内嵌 Chromium 内核 · 自动登录与导出均在应用内完成';
+    document.getElementById('st-right').textContent = state.loggedIn ? '已登录' : '未登录';
+  }else if(state.view==='about'){
+    document.getElementById('st-left').textContent = 'SYNUTV · 合并版界面演示';
+    document.getElementById('st-right').textContent = 'v3.0';
+  }else{
+    updateFreetimeStatus();
+  }
+}
+
+/* =========================================================
+   事件绑定
+   ========================================================= */
+document.querySelectorAll('.rail-item').forEach(function(b){
+  b.addEventListener('click', function(){ switchView(b.dataset.view); });
+});
+document.querySelectorAll('[data-close]').forEach(function(el){
+  el.addEventListener('click', function(){
+    document.getElementById(el.dataset.close==='roster' ? 'roster-modal' : 'acct-modal').hidden = true;
+  });
+});
+
+/* 账号页 */
+document.getElementById('acct-search').addEventListener('input', renderAccounts);
+document.getElementById('acct-list').addEventListener('click', function(e){
+  var card = e.target.closest('.acct-card');
+  var actBtn = e.target.closest('[data-act]');
+  if(actBtn){
+    var id = Number(actBtn.dataset.id);
+    var acct = ACCOUNTS.filter(function(a){ return a.id===id; })[0];
+    if(actBtn.dataset.act==='active'){
+      ACCOUNTS.forEach(function(a){ a.active = (a.id===id); });
+      state.selAccount = id;
+      renderAccounts();
+      toast('已把「'+acct.nickname+'」设为当前账号');
+    }else if(actBtn.dataset.act==='copy'){
+      toast('密码已复制，30 秒后自动清空剪贴板');
+    }else if(actBtn.dataset.act==='del'){
+      ACCOUNTS = ACCOUNTS.filter(function(a){ return a.id!==id; });
+      renderAccounts();
+      toast('已删除账号：'+acct.nickname);
+    }
+    return;
+  }
+  if(card){
+    state.selAccount = Number(card.dataset.id);
+    renderAccounts();
+  }
+});
+document.getElementById('acct-add').addEventListener('click', function(){
+  document.getElementById('acct-modal-title').textContent = '新增账号';
+  ['nick','user','pass','notes'].forEach(function(k){ document.getElementById('acct-f-'+k).value = ''; });
+  document.getElementById('acct-modal').hidden = false;
+});
+document.getElementById('acct-save').addEventListener('click', function(){
+  var nick = document.getElementById('acct-f-nick').value.trim();
+  var user = document.getElementById('acct-f-user').value.trim();
+  var pass = document.getElementById('acct-f-pass').value;
+  if(!nick || !user || !pass){ toast('昵称、用户名和密码不能为空'); return; }
+  ACCOUNTS.push({
+    id: Math.max.apply(null, ACCOUNTS.map(function(a){ return a.id; })) + 1,
+    nickname: nick, username: user,
+    notes: document.getElementById('acct-f-notes').value.trim(),
+    active:false, imported:false
+  });
+  document.getElementById('acct-modal').hidden = true;
+  renderAccounts();
+  toast('已新增账号：'+nick);
+});
+document.getElementById('acct-import').addEventListener('click', function(){ toast('已导入 CSV（演示）'); });
+document.getElementById('acct-export').addEventListener('click', function(){ toast('已导出账号列表，出于安全考虑不含密码（演示）'); });
+
+/* 课表导出页 */
+document.getElementById('browser-login').addEventListener('click', mockLogin);
+document.getElementById('browser-logout').addEventListener('click', function(){
+  state.loggedIn = false;
+  document.getElementById('browser-hint').textContent = '尚未登录';
+  document.getElementById('url-dot').style.background = 'var(--win-text-muted)';
+  document.getElementById('mock-url-text').textContent = 'about:blank';
+  document.getElementById('mock-page').className = 'mock-page blank';
+  document.getElementById('mock-page').innerHTML = '<div style="font-size:12.5px">已清除登录状态（cookies 已删除）</div>';
+  toast('已清除登录状态');
+});
+document.getElementById('goto-freetime').addEventListener('click', function(){ switchView('freetime'); });
+
+/* 空课表页 */
+document.getElementById('ft-week').addEventListener('change', function(){ 
+  state.week = this.value==='all' ? 'all' : Number(this.value);
+  renderFreetimeGrid();
+});
+document.getElementById('ft-group').addEventListener('change', function(){ state.group = this.value; renderPeopleSidebar(); renderFreetimeGrid(); });
+document.getElementById('ft-semester').addEventListener('change', function(){ state.semester = this.value; renderPeopleSidebar(); });
+document.getElementById('ft-search').addEventListener('input', renderPeopleSidebar);
+document.getElementById('ft-people').addEventListener('change', function(e){
+  var cb = e.target.closest('.person-check');
+  if(!cb) return;
+  var i = Number(cb.dataset.idx);
+  if(cb.checked) state.selected.add(i); else state.selected.delete(i);
+  renderFreetimeGrid();
+});
+document.getElementById('ft-grid').addEventListener('click', function(e){
+  var td = e.target.closest('.slot');
+  if(td) openRoster(Number(td.dataset.day), Number(td.dataset.period));
+});
+document.getElementById('ft-import').addEventListener('click', function(){ toast('选择课表 PDF 或文件夹开始导入（演示）'); });
+document.getElementById('ft-export').addEventListener('click', function(){ toast('结果导出功能开发中，下一版提供'); });
+
+/* 启动 */
+renderAccounts();
+populateFreetimeSelects();
+renderFreetime();
+updateStatusbar();
+</script>
+</body>
+</html>

@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>导出界面原型 · 多人空课表</title>
+<style>
+  html, body { margin: 0; padding: 16px; background: light-dark(#eef1f5, #0f1115); color-scheme: light dark; }
+</style>
+</head>
+<body><div id="export-demo">
+  <style>
+    #export-demo{
+      --ex-bg: light-dark(#f2f4f7, #14171c);
+      --ex-surface: light-dark(#ffffff, #2b2b2b);
+      --ex-surface-2: light-dark(#f7f8fa, #323232);
+      --ex-border: light-dark(#dfe3e8, #3a3f47);
+      --ex-text: light-dark(#1b2530, #eef1f5);
+      --ex-muted: light-dark(#68727f, #9aa3ae);
+      --ex-accent: light-dark(#0f6cbd, #4cc2ff);
+      --ex-accent-fg: light-dark(#ffffff, #0b1b2b);
+      --ex-free: light-dark(#107c10, #6ccb5f);
+      color-scheme: light dark;
+      font-family:"Segoe UI","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+      font-size:13px; line-height:1.5; color:var(--ex-text);
+      background:var(--ex-bg); border:1px solid var(--ex-border); border-radius:12px;
+      padding:18px; box-shadow:0 18px 48px rgba(0,0,0,.16);
+    }
+    #export-demo *{ box-sizing:border-box; }
+    #export-demo .ex-dialog{ background:var(--ex-surface); border:1px solid var(--ex-border); border-radius:10px; overflow:hidden; max-width:760px; margin:0 auto; }
+    #export-demo .ex-head{ display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--ex-border); font-weight:600; }
+    #export-demo .ex-x{ border:none; background:transparent; color:var(--ex-muted); cursor:pointer; font-size:13px; padding:2px 7px; border-radius:5px; }
+    #export-demo .ex-x:hover{ background:var(--ex-surface-2); color:var(--ex-text); }
+    #export-demo .ex-body{ padding:14px 16px; display:flex; flex-direction:column; gap:14px; }
+    #export-demo .ex-label{ font-size:12px; color:var(--ex-muted); margin-bottom:7px; }
+    #export-demo .ex-seg{ display:inline-flex; border:1px solid var(--ex-border); border-radius:7px; overflow:hidden; }
+    #export-demo .ex-seg-btn{ border:none; background:var(--ex-surface); color:var(--ex-muted); font-family:inherit; font-size:13px; padding:7px 14px; cursor:pointer; }
+    #export-demo .ex-seg-btn + .ex-seg-btn{ border-left:1px solid var(--ex-border); }
+    #export-demo .ex-seg-btn.is-active{ background:color-mix(in srgb, var(--ex-accent) 14%, var(--ex-surface)); color:var(--ex-accent); font-weight:600; }
+    #export-demo .ex-row{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:8px; }
+    #export-demo .ex-row:last-child{ margin-bottom:0; }
+    #export-demo .ex-inline{ display:inline-flex; align-items:center; gap:6px; color:var(--ex-muted); font-size:12px; }
+    #export-demo .ex-inline-label{ color:var(--ex-muted); font-size:12px; }
+    #export-demo .ex-select{ font-family:inherit; font-size:13px; height:30px; padding:0 8px; border-radius:6px; border:1px solid var(--ex-border); background:var(--ex-surface); color:var(--ex-text); }
+    #export-demo .ex-week-select{ height:26px; font-size:12px; }
+    #export-demo .ex-radio{ display:inline-flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; }
+    #export-demo .ex-radio input{ accent-color:var(--ex-accent); }
+    #export-demo .ex-hint{ font-size:12px; color:var(--ex-muted); }
+    #export-demo .ex-preview{ border:1px solid var(--ex-border); border-radius:8px; overflow:auto; max-height:300px; }
+    #export-demo .ex-table{ width:100%; border-collapse:collapse; font-size:12px; }
+    #export-demo .ex-table th, #export-demo .ex-table td{ padding:6px 8px; border-bottom:1px solid var(--ex-border); text-align:left; vertical-align:top; }
+    #export-demo .ex-table th{ background:var(--ex-surface-2); color:var(--ex-muted); font-weight:500; white-space:nowrap; }
+    #export-demo .ex-table tr:last-child td{ border-bottom:none; }
+    #export-demo .ex-grid td, #export-demo .ex-grid th{ text-align:center; }
+    #export-demo .ex-grid .ex-period{ color:var(--ex-muted); font-weight:400; white-space:nowrap; }
+    #export-demo .ex-cell-none{ color:var(--ex-muted); }
+    #export-demo .ex-cell-some{ background:color-mix(in srgb, var(--ex-free) var(--ex-mix,30%), var(--ex-surface)); }
+    #export-demo .ex-cell-full{ background:color-mix(in srgb, var(--ex-free) 24%, var(--ex-surface)); color:var(--ex-free); font-weight:600; }
+    #export-demo .ex-courses{ color:var(--ex-muted); }
+    #export-demo .ex-more{ padding:8px 10px; font-size:12px; color:var(--ex-muted); }
+    #export-demo .ex-foot{ display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid var(--ex-border); background:var(--ex-surface-2); }
+    #export-demo .ex-btn{ font-family:inherit; font-size:13px; padding:7px 16px; border-radius:6px; border:1px solid var(--ex-border); background:var(--ex-surface); color:var(--ex-text); cursor:pointer; }
+    #export-demo .ex-btn-primary{ background:var(--ex-accent); border-color:var(--ex-accent); color:var(--ex-accent-fg); font-weight:600; }
+  </style>
+
+  <div class="ex-dialog">
+    <div class="ex-head">
+      <span>导出</span>
+      <button class="ex-x" type="button" aria-label="关闭">✕</button>
+    </div>
+
+    <div class="ex-body">
+      <div class="ex-field">
+        <div class="ex-label">导出内容</div>
+        <div class="ex-seg" id="ex-content" role="group" aria-label="导出内容">
+          <button type="button" class="ex-seg-btn is-active" data-content="grid">空课表总表</button>
+          <button type="button" class="ex-seg-btn" data-content="list">空闲名单</button>
+          <button type="button" class="ex-seg-btn" data-content="person">个人课表</button>
+        </div>
+      </div>
+
+      <div class="ex-field">
+        <div class="ex-label">范围</div>
+        <div class="ex-row">
+          <label class="ex-inline">学期
+            <select class="ex-select" id="ex-semester"><option>2026-2027学年第1学期</option></select>
+          </label>
+          <label class="ex-inline">分组
+            <select class="ex-select" id="ex-group">
+              <option value="全部">全部分组</option>
+              <option value="部长">部长</option>
+              <option value="台务">台务</option>
+              <option value="部员">部员</option>
+            </select>
+          </label>
+        </div>
+        <div class="ex-row">
+          <span class="ex-inline-label">周次</span>
+          <label class="ex-radio"><input type="radio" name="ex-week" value="single" checked>第</label>
+          <select class="ex-select ex-week-select" id="ex-week"></select>
+          <label class="ex-radio"><span>周</span></label>
+          <label class="ex-radio"><input type="radio" name="ex-week" value="all">全部周次（汇总）</label>
+        </div>
+        <div class="ex-hint" id="ex-people-hint"></div>
+      </div>
+
+      <div class="ex-field">
+        <div class="ex-label">文件格式</div>
+        <div class="ex-row">
+          <label class="ex-radio"><input type="radio" name="ex-format" value="xlsx" checked>Excel (.xlsx)</label>
+          <label class="ex-radio"><input type="radio" name="ex-format" value="csv">CSV</label>
+          <label class="ex-radio"><input type="radio" name="ex-format" value="png">图片 (PNG)</label>
+        </div>
+      </div>
+
+      <div class="ex-field">
+        <div class="ex-label">预览</div>
+        <div class="ex-preview" id="ex-preview"></div>
+      </div>
+    </div>
+
+    <div class="ex-foot">
+      <button class="ex-btn" type="button">取消</button>
+      <button class="ex-btn ex-btn-primary" type="button">导出</button>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      var DAYS = ['周一','周二','周三','周四','周五','周六','周日'];
+      var PERIODS = [1,2,3,4,5,6,7,8,9,10,11];
+      var ALL_WEEKS = [];
+      for(var i=1;i<=18;i++) ALL_WEEKS.push(i);
+
+      function wk(from, to, parity){
+        var out = [];
+        for(var i=from;i<=to;i++){
+          if(parity==='odd' && i%2===0) continue;
+          if(parity==='even' && i%2!==0) continue;
+          out.push(i);
+        }
+        return out;
+      }
+      function C(name, day, start, end, weeks){ return {name:name, day:day, start:start, end:end, weeks:weeks}; }
+
+      var PEOPLE = [
+        {name:'伍雅芳', group:'部长', courses:[
+          C('高等数学',1,1,2,wk(1,16)), C('物理实验',2,5,6,wk(1,8)),
+          C('大学英语',3,3,4,wk(1,18)), C('线性代数',5,1,2,wk(1,15))]},
+        {name:'何佳宁', group:'部长', courses:[
+          C('高等数学',1,1,2,wk(1,16)), C('程序设计',1,3,4,wk(1,16)),
+          C('大学英语',2,3,4,wk(1,18)), C('数据结构',4,5,6,wk(1,16))]},
+        {name:'白馨予', group:'台务', courses:[
+          C('大学物理',2,1,2,wk(1,16)), C('线性代数',3,3,4,wk(2,16,'even')),
+          C('体育',4,3,4,wk(1,15)), C('思政实践',5,5,6,wk(1,16,'odd'))]},
+        {name:'陈心怡', group:'台务', courses:[
+          C('高等数学',1,3,4,wk(1,16)), C('大学英语',2,1,2,wk(1,18)),
+          C('化工原理',3,7,8,wk(1,16)), C('体育',5,3,4,wk(1,15))]},
+        {name:'董斌文', group:'部员', courses:[
+          C('线性代数',1,1,2,wk(2,16,'even')), C('大学物理',2,3,4,wk(1,16)),
+          C('化工原理',4,1,2,wk(1,16)), C('程序设计',5,1,2,wk(1,16))]},
+        {name:'甘润东', group:'部员', courses:[
+          C('体育',1,5,6,wk(1,15)), C('高等数学',2,1,2,wk(1,16)),
+          C('大学英语',4,3,4,wk(1,18)), C('思政实践',5,5,6,wk(1,16))]}
+      ];
+
+      var state = { content:'grid', group:'全部', weekMode:'single', week:1, format:'xlsx' };
+
+      function activePeople(){
+        if(state.group === '全部') return PEOPLE;
+        return PEOPLE.filter(function(p){ return p.group === state.group; });
+      }
+      function isBusy(p, day, period, week){
+        return p.courses.some(function(c){
+          return c.day === day && period >= c.start && period <= c.end && c.weeks.indexOf(week) !== -1;
+        });
+      }
+      function freeAt(day, period){
+        var list = activePeople();
+        if(state.weekMode === 'all'){
+          return list.filter(function(p){
+            return ALL_WEEKS.every(function(w){ return !isBusy(p, day, period, w); });
+          });
+        }
+        return list.filter(function(p){ return !isBusy(p, day, period, state.week); });
+      }
+
+      function gridPreview(){
+        var total = activePeople().length;
+        var html = '<table class="ex-table ex-grid"><thead><tr><th class="ex-period">节次</th>';
+        for(var d=0; d<7; d++) html += '<th>' + DAYS[d] + '</th>';
+        html += '</tr></thead><tbody>';
+        PERIODS.forEach(function(p){
+          html += '<tr><td class="ex-period">第' + p + '节</td>';
+          for(var day=1; day<=7; day++){
+            var n = freeAt(day, p).length;
+            if(n === 0){ html += '<td class="ex-cell-none">—</td>'; continue; }
+            var cls = (n === total) ? 'ex-cell-full' : 'ex-cell-some';
+            var mix = total ? Math.round(n / total * 100) : 0;
+            html += '<td class="' + cls + '" style="--ex-mix:' + mix + '%">' + n + '人</td>';
+          }
+          html += '</tr>';
+        });
+        return html + '</tbody></table>';
+      }
+
+      function listPreview(){
+        var rows = [];
+        for(var day=1; day<=7; day++){
+          PERIODS.forEach(function(p){
+            var free = freeAt(day, p);
+            if(free.length) rows.push({ day: day, period: p, names: free.map(function(x){ return x.name; }) });
+          });
+        }
+        var html = '<table class="ex-table"><thead><tr><th>星期</th><th>节次</th><th>空闲人员</th></tr></thead><tbody>';
+        rows.slice(0, 8).forEach(function(r){
+          html += '<tr><td>' + DAYS[r.day-1] + '</td><td>第' + r.period + '节</td><td>' + r.names.join('、') + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        if(rows.length > 8) html += '<div class="ex-more">… 共 ' + rows.length + ' 个空闲时段</div>';
+        return html;
+      }
+
+      function personPreview(){
+        var html = '<table class="ex-table"><thead><tr><th>姓名</th><th>分组</th><th>课程</th></tr></thead><tbody>';
+        activePeople().forEach(function(p){
+          var names = p.courses.map(function(c){ return c.name; }).join('、');
+          html += '<tr><td>' + p.name + '</td><td>' + p.group + '</td><td class="ex-courses">' + names + '</td></tr>';
+        });
+        return html + '</tbody></table>';
+      }
+
+      function render(){
+        var pv = document.getElementById('ex-preview');
+        if(state.content === 'grid') pv.innerHTML = gridPreview();
+        else if(state.content === 'list') pv.innerHTML = listPreview();
+        else pv.innerHTML = personPreview();
+
+        var label = state.weekMode === 'all' ? '全部周次' : ('第' + state.week + '周');
+        document.getElementById('ex-people-hint').textContent =
+          '人员：已选 ' + activePeople().length + ' / ' + PEOPLE.length + ' 人（在左侧勾选调整） · ' + label;
+      }
+
+      var weekSel = document.getElementById('ex-week');
+      var options = '';
+      for(var w=1; w<=18; w++) options += '<option value="' + w + '">' + w + '</option>';
+      weekSel.innerHTML = options;
+
+      document.querySelectorAll('#ex-content .ex-seg-btn').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          state.content = btn.getAttribute('data-content');
+          document.querySelectorAll('#ex-content .ex-seg-btn').forEach(function(b){
+            b.classList.toggle('is-active', b === btn);
+          });
+          render();
+        });
+      });
+      document.getElementById('ex-group').addEventListener('change', function(e){
+        state.group = e.target.value;
+        render();
+      });
+      weekSel.addEventListener('change', function(e){
+        state.week = Number(e.target.value);
+        render();
+      });
+      document.querySelectorAll('input[name="ex-week"]').forEach(function(radio){
+        radio.addEventListener('change', function(){
+          state.weekMode = radio.value;
+          render();
+        });
+      });
+      document.querySelectorAll('input[name="ex-format"]').forEach(function(radio){
+        radio.addEventListener('change', function(){ state.format = radio.value; });
+      });
+
+      render();
+    })();
+  </script>
+</div></body>
+</html>

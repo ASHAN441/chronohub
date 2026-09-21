@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 本地用户数据（包含加密后的账号信息，禁止提交）
+data/
+
+# 导出的 PDF 等用户文件
+*.pdf
+
+# 本地字体资源（体积大，且为系统字体，不提交）
+assets/
+
+# PyInstaller 构建产物
+build/
+dist/
+*.spec
+
+# 测试与工具缓存
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

@@ -1,0 +1,42 @@
+# ===== 仓库历史归档（勿提交）=====
+# 原 教务 / 空课表 两个子仓库的 .git 与 bundle 备份
+.git_history_backup/
+
+# ===== 助手工作区数据（本地状态，不入库）=====
+.workbuddy/
+
+# ===== 操作系统 =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== 编辑器 / IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ===== 构建产物 =====
+build/
+dist/
+*.spec
+
+# ===== 临时文件 =====
+tmp/
+*.log
+
+# ===== 本地用户数据 =====
+# 注意：这里不能写全局的 *.pdf —— 教务/ 的导出 PDF 已由它自己的 .gitignore 排除，
+# 而 空课表/tests/fixtures/ 下的 PDF 是解析器测试样本，必须入库。
+data/

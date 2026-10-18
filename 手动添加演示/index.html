@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>空课表PRO · 手动添加特殊安排（界面演示）</title>
+<style>
+  :root{ color-scheme: light dark; }
+  html, body{ height:100%; margin:0; }
+  body{
+    --win-bg: light-dark(#f3f3f3, #202020);
+    --win-surface: light-dark(#ffffff, #2b2b2b);
+    --win-surface-2: light-dark(#f9f9f9, #323232);
+    --win-surface-3: light-dark(#ebebeb, #3a3a3a);
+    --win-text: light-dark(#1b1b1b, #f0f0f0);
+    --win-text-muted: light-dark(#5f5f5f, #b0b0b0);
+    --win-border: light-dark(#d9d9d9, #3a3a3a);
+    --win-accent: light-dark(#0078d4, #4cc2ff);
+    --win-accent-fg: light-dark(#ffffff, #0b1b2b);
+    --win-accent-soft: color-mix(in srgb, var(--win-accent) 13%, var(--win-surface));
+    --win-free: light-dark(#107c10, #6ccb5f);
+    --win-warn: light-dark(#9d5d00, #f0b429);
+    --win-warn-soft: color-mix(in srgb, var(--win-warn) 14%, var(--win-surface));
+    --win-danger: #c42b1c;
+    --cell-pad: 5px 8px;
+    font-family: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+    color: var(--win-text);
+    background: var(--win-bg);
+    font-size: 13px;
+    line-height: 1.45;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  *, *::before, *::after{ box-sizing: border-box; }
+  button, input, select{ font-family: inherit; }
+
+  /* ---------- 演示提示条（真实应用里不会有） ---------- */
+  .demo-bar{ flex:none; display:flex; align-items:center; gap:8px; padding:6px 12px; font-size:12px;
+    background: var(--win-accent-soft); color: var(--win-text); border-bottom:1px solid var(--win-border); }
+  .demo-bar b{ color: var(--win-accent); }
+
+  /* ---------- 标题栏 ---------- */
+  .win-titlebar{ display:flex; align-items:stretch; height:36px; flex:none; background:var(--win-surface); border-bottom:1px solid var(--win-border); user-select:none; }
+  .win-titlebar-left{ display:flex; align-items:center; gap:9px; padding-left:12px; min-width:0; }
+  .win-logo{ width:18px; height:18px; border-radius:4px; background:var(--win-accent); color:var(--win-accent-fg);
+    display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; }
+  .win-title{ font-size:12px; color:var(--win-text-muted); white-space:nowrap; }
+  .win-controls{ margin-left:auto; display:flex; flex:none; }
+  .win-controls button{ width:46px; height:36px; border:none; background:transparent; color:var(--win-text); font-size:12px; cursor:default; }
+  .win-controls button:hover{ background:var(--win-surface-3); }
+
+  /* ---------- 工具栏 ---------- */
+  .win-toolbar{ display:flex; align-items:center; gap:8px; padding:8px 12px; flex:none;
+    background:var(--win-surface); border-bottom:1px solid var(--win-border); flex-wrap:wrap; }
+  .tb-btn{ display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 11px; border:1px solid transparent;
+    border-radius:5px; background:transparent; color:var(--win-text); font-size:13px; cursor:pointer; }
+  .tb-btn:hover{ background:var(--win-surface-3); }
+  .tb-btn.primary{ background:var(--win-accent); color:var(--win-accent-fg); }
+  .tb-btn.primary:hover{ background:color-mix(in srgb, var(--win-accent) 88%, #000); }
+  .tb-btn.ghost{ border-color:var(--win-border); }
+  .tb-sep{ width:1px; height:20px; background:var(--win-border); margin:0 2px; }
+  .tb-field{ display:inline-flex; align-items:center; gap:7px; color:var(--win-text-muted); font-size:12px; }
+  .tb-select{ font-size:13px; height:30px; padding:0 8px; border-radius:5px; border:1px solid var(--win-border);
+    background:var(--win-surface); color:var(--win-text); }
+  .tb-spacer{ flex:1; }
+  .tb-info{ font-size:12px; color:var(--win-text-muted); }
+  .tb-info strong{ color:var(--win-text); font-weight:600; }
+
+  /* ---------- 主体三栏 ---------- */
+  .win-body{ display:flex; align-items:stretch; flex:1; min-height:0; }
+  .win-sidebar{ width:196px; flex:none; border-right:1px solid var(--win-border); background:var(--win-surface);
+    padding:12px 10px; overflow-y:auto; }
+  .side-title{ font-size:12px; font-weight:600; padding:0 6px; }
+  .side-sub{ font-size:11px; color:var(--win-text-muted); padding:2px 6px 10px; }
+  .people{ display:flex; flex-direction:column; gap:2px; }
+  .person{ display:flex; align-items:center; gap:8px; padding:6px; border-radius:5px; cursor:pointer; }
+  .person:hover{ background:var(--win-surface-2); }
+  .person input{ accent-color:var(--win-accent); margin:0; }
+  .avatar{ width:24px; height:24px; border-radius:50%; background:var(--win-accent-soft); color:var(--win-accent);
+    display:flex; align-items:center; justify-content:center; font-size:12px; flex:none; }
+  .person-names{ min-width:0; display:flex; flex-direction:column; }
+  .person-name{ font-size:13px; }
+  .person-meta{ font-size:11px; color:var(--win-text-muted); }
+
+  .win-main{ flex:1; min-width:0; padding:12px; display:flex; flex-direction:column; }
+  .grid-wrap{ flex:1; min-height:0; overflow:auto; border:1px solid var(--win-border); border-radius:6px;
+    background:var(--win-border); }
+  .win-grid{ width:100%; border-collapse:separate; border-spacing:1px; min-width:640px; table-layout:fixed; }
+  .win-grid th, .win-grid td{ background:var(--win-surface); }
+  .win-grid th{ padding:7px; font-size:12px; font-weight:600; color:var(--win-text-muted); text-align:center; }
+  .win-grid .group-row td{ padding:3px 10px; font-size:11px; color:var(--win-text-muted);
+    background:var(--win-surface-3); text-align:left; }
+  .win-grid .period-cell{ text-align:center; font-size:12px; color:var(--win-text-muted); width:50px; }
+  .win-grid .slot{ padding:var(--cell-pad); font-size:12px; vertical-align:middle; text-align:center;
+    min-width:88px; cursor:pointer; position:relative; }
+  .win-grid .slot:hover{ outline:1px solid var(--win-accent); outline-offset:-1px; }
+  .win-grid .slot.none{ background:var(--win-surface-2); color:var(--win-text-muted); }
+  .win-grid .slot.some{ background:color-mix(in srgb, var(--win-free) var(--mix,40%), var(--win-surface)); }
+  .win-grid .slot.full{ background:color-mix(in srgb, var(--win-free) var(--mix,100%), var(--win-surface)); }
+  .win-grid .slot .cell-big{ font-size:15px; font-weight:600; line-height:1.25; }
+  .win-grid .slot .cell-sub{ font-size:11px; color:var(--win-text-muted); }
+  /* 手动安排影响到的格子：右上角一个角标 + 细描边 */
+  .win-grid .slot.touched{ box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--win-warn) 55%, transparent); }
+  .win-grid .slot.touched::after{
+    content:""; position:absolute; top:3px; right:3px; width:6px; height:6px; border-radius:50%;
+    background:var(--win-warn);
+  }
+
+  .legend{ display:flex; align-items:center; gap:14px; margin-top:9px; font-size:12px;
+    color:var(--win-text-muted); flex-wrap:wrap; flex:none; }
+  .legend-item{ display:inline-flex; align-items:center; gap:6px; }
+  .dot{ width:10px; height:10px; border-radius:2px; }
+  .dot.none{ background:var(--win-surface-2); border:1px solid var(--win-border); }
+  .dot.some{ background:color-mix(in srgb, var(--win-free) 45%, var(--win-surface)); }
+  .dot.full{ background:var(--win-free); }
+  .dot.manual{ border-radius:50%; background:var(--win-warn); }
+
+  /* ---------- 右侧：特殊安排列表 ---------- */
+  .manual{ width:272px; flex:none; border-left:1px solid var(--win-border); background:var(--win-surface);
+    display:flex; flex-direction:column; min-height:0; }
+  .manual-head{ padding:11px 12px 9px; border-bottom:1px solid var(--win-border); flex:none; }
+  .manual-head-row{ display:flex; align-items:center; gap:8px; }
+  .manual-head h3{ margin:0; font-size:13px; font-weight:600; }
+  .manual-count{ font-size:11px; color:var(--win-text-muted); }
+  .manual-list{ flex:1; overflow-y:auto; padding:8px; display:flex; flex-direction:column; gap:7px; }
+  .manual-empty{ color:var(--win-text-muted); font-size:12px; text-align:center; padding:28px 16px; line-height:1.8; }
+  .mi{ border:1px solid var(--win-border); border-radius:6px; padding:8px 10px; background:var(--win-surface-2); }
+  .mi-top{ display:flex; align-items:center; gap:6px; }
+  .tag{ font-size:10.5px; padding:1px 7px; border-radius:999px; border:1px solid transparent; flex:none; }
+  .tag.busy{ color:var(--win-warn); background:var(--win-warn-soft);
+    border-color:color-mix(in srgb, var(--win-warn) 40%, var(--win-border)); }
+  .tag.free{ color:var(--win-free); background:color-mix(in srgb, var(--win-free) 13%, var(--win-surface));
+    border-color:color-mix(in srgb, var(--win-free) 38%, var(--win-border)); }
+  .mi-label{ font-size:12.5px; font-weight:600; }
+  .mi-del{ margin-left:auto; width:20px; height:20px; border:1px solid var(--win-border); background:var(--win-surface);
+    color:var(--win-text-muted); border-radius:5px; cursor:pointer; font-size:13px; line-height:1; padding:0; }
+  .mi-del:hover{ color:var(--win-danger); border-color:color-mix(in srgb, var(--win-danger) 45%, var(--win-border));
+    background:color-mix(in srgb, var(--win-danger) 10%, var(--win-surface)); }
+  .mi-line{ font-size:11.5px; color:var(--win-text-muted); margin-top:3px; line-height:1.6; }
+  .mi-who{ color:var(--win-text); }
+
+  /* ---------- 弹窗 ---------- */
+  .modal{ position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.28); }
+  .modal[hidden]{ display:none; }
+  .modal-card{ width:620px; max-width:94vw; max-height:92vh; overflow:auto; background:var(--win-surface);
+    border:1px solid var(--win-border); border-radius:8px; box-shadow:0 18px 48px rgba(0,0,0,.28);
+    display:flex; flex-direction:column; }
+  .modal-head{ display:flex; align-items:center; gap:10px; padding:13px 16px; border-bottom:1px solid var(--win-border); }
+  .modal-head h2{ margin:0; font-size:14px; font-weight:600; }
+  .modal-close{ margin-left:auto; width:26px; height:26px; border:none; background:transparent; color:var(--win-text-muted);
+    border-radius:5px; cursor:pointer; font-size:15px; line-height:1; }
+  .modal-close:hover{ background:var(--win-surface-3); }
+  .modal-body{ padding:14px 16px; display:flex; flex-direction:column; gap:15px; }
+  .modal-foot{ display:flex; gap:8px; justify-content:flex-end; padding:12px 16px;
+    border-top:1px solid var(--win-border); }
+
+  .field{ display:flex; flex-direction:column; gap:6px; }
+  .field-label{ font-size:12px; color:var(--win-text-muted); }
+  .field-label b{ color:var(--win-text); font-weight:600; }
+
+  .seg{ display:inline-flex; gap:0; border:1px solid var(--win-border); border-radius:6px; overflow:hidden; }
+  .seg button{ border:none; background:var(--win-surface); color:var(--win-text); padding:7px 14px; font-size:13px;
+    cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+  .seg button + button{ border-left:1px solid var(--win-border); }
+  .seg button.on{ background:var(--win-accent); color:var(--win-accent-fg); }
+  .seg button.on.free-on{ background:var(--win-free); color:#fff; }
+
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ border:1px solid var(--win-border); background:var(--win-surface); color:var(--win-text);
+    border-radius:999px; padding:4px 11px; font-size:12.5px; cursor:pointer; }
+  .chip:hover{ background:var(--win-surface-3); }
+  .chip.on{ background:var(--win-accent); color:var(--win-accent-fg); border-color:transparent; }
+  .chip-group{ display:flex; flex-direction:column; gap:5px; }
+  .chip-group-label{ font-size:11px; color:var(--win-text-muted); }
+
+  .input{ height:30px; border-radius:5px; border:1px solid var(--win-border); background:var(--win-surface);
+    color:var(--win-text); padding:0 9px; font-size:13px; }
+  .input.full{ width:100%; }
+  .row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .hint{ font-size:11.5px; color:var(--win-text-muted); }
+  .preview{ border:1px dashed var(--win-border); border-radius:6px; padding:8px 11px; font-size:12px;
+    color:var(--win-text-muted); background:var(--win-surface-2); line-height:1.7; }
+  .preview b{ color:var(--win-text); }
+
+  ::-webkit-scrollbar{ width:10px; height:10px; }
+  ::-webkit-scrollbar-thumb{ background:color-mix(in srgb, var(--win-text-muted) 35%, transparent); border-radius:5px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+</style>
+</head>
+<body>
+
+<div class="demo-bar">
+  <b>界面演示</b>
+  <span>数据是假的。可以试：勾选左侧人员 · 点任意格子快速添加 · 右栏删除条目 · 切换周次看影响</span>
+</div>
+
+<header class="win-titlebar">
+  <div class="win-titlebar-left">
+    <span class="win-logo">空</span>
+    <span class="win-title">空课表PRO v3.1 · 手动添加特殊安排（演示）</span>
+  </div>
+  <div class="win-controls"><button>─</button><button>□</button><button>✕</button></div>
+</header>
+
+<div class="win-toolbar">
+  <label class="tb-field">周次
+    <select class="tb-select" id="week-select"></select>
+  </label>
+  <button class="tb-btn ghost" id="btn-all">全选</button>
+  <button class="tb-btn ghost" id="btn-none">全不选</button>
+  <span class="tb-sep"></span>
+  <button class="tb-btn primary" id="btn-add">＋ 添加特殊安排</button>
+  <span class="tb-spacer"></span>
+  <span class="tb-info" id="summary"></span>
+</div>
+
+<div class="win-body">
+  <aside class="win-sidebar">
+    <div class="side-title">人员</div>
+    <div class="side-sub">勾选的人参与统计</div>
+    <div class="people" id="people"></div>
+  </aside>
+
+  <main class="win-main">
+    <div class="grid-wrap">
+      <table class="win-grid">
+        <thead>
+          <tr><th style="width:50px">节次</th><th>周一</th><th>周二</th><th>周三</th><th>周四</th><th>周五</th><th>周六</th><th>周日</th></tr>
+        </thead>
+        <tbody id="grid-body"></tbody>
+      </table>
+    </div>
+    <div class="legend">
+      <span class="legend-item"><span class="dot none"></span>无人有空</span>
+      <span class="legend-item"><span class="dot some"></span>部分有空</span>
+      <span class="legend-item"><span class="dot full"></span>全部有空</span>
+      <span class="legend-item"><span class="dot manual"></span>含手动安排</span>
+      <span class="tb-spacer"></span>
+      <span>格子里是「有空人数 / 已选人数」</span>
+    </div>
+  </main>
+
+  <aside class="manual">
+    <div class="manual-head">
+      <div class="manual-head-row">
+        <h3>特殊安排</h3>
+        <span class="manual-count" id="manual-count"></span>
+      </div>
+      <div class="hint" style="margin-top:4px">课表里体现不了的情况，加在这里</div>
+    </div>
+    <div class="manual-list" id="manual-list"></div>
+  </aside>
+</div>
+
+<!-- 添加 / 编辑弹窗 -->
+<div class="modal" id="modal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2 id="modal-title">添加特殊安排</h2>
+      <button class="modal-close" id="modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="field">
+        <span class="field-label"><b>类型</b> —— 这段时间是「有事」还是「其实有空」？</span>
+        <div class="seg" id="type-seg">
+          <button data-type="busy" class="on">避开 · 有事</button>
+          <button data-type="free">可用 · 课取消</button>
+        </div>
+        <div class="hint" id="type-hint">「有事」会让人在这段时间不算有空，例如例会、值班、临时活动。</div>
+      </div>
+
+      <div class="field">
+        <span class="field-label"><b>谁</b>（可多选）</span>
+        <div class="chips" id="who-chips"></div>
+      </div>
+
+      <div class="field">
+        <span class="field-label"><b>星期</b>（可多选）</span>
+        <div class="chips" id="day-chips"></div>
+      </div>
+
+      <div class="field">
+        <span class="field-label"><b>节次</b>（可多选）</span>
+        <div id="period-chips" style="display:flex; flex-direction:column; gap:7px"></div>
+        <div class="row">
+          <button class="tb-btn ghost" data-quick="1-4" type="button">上午整段</button>
+          <button class="tb-btn ghost" data-quick="5-8" type="button">下午整段</button>
+          <button class="tb-btn ghost" data-quick="9-11" type="button">晚上整段</button>
+          <button class="tb-btn ghost" data-quick="clear" type="button">清空</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field-label"><b>周次</b></span>
+        <div class="row">
+          <div class="seg" id="week-seg">
+            <button data-week="all" class="on">全部周</button>
+            <button data-week="odd">单周</button>
+            <button data-week="even">双周</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field-label"><b>原因</b>（选一个，或自己写）</span>
+        <div class="chips" id="label-chips"></div>
+        <input class="input full" id="label-input" placeholder="例如：部门例会 / 校运会值班 / 老师调课">
+      </div>
+
+      <div class="field">
+        <span class="field-label">影响预览</span>
+        <div class="preview" id="preview"></div>
+      </div>
+
+    </div>
+    <div class="modal-foot">
+      <button class="tb-btn ghost" id="modal-cancel">取消</button>
+      <button class="tb-btn primary" id="modal-save">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var DAYS = ['周一','周二','周三','周四','周五','周六','周日'];
+  var GROUPS = [{label:'上午',from:1,to:4},{label:'下午',from:5,to:8},{label:'晚上',from:9,to:11}];
+  var MAX_PERIOD = 11;
+  var MAX_WEEK = 18;
+
+  function range(from, to){
+    var out = [];
+    for(var i=from;i<=to;i++) out.push(i);
+    return out;
+  }
+  function weeksAll(){ return range(1, MAX_WEEK); }
+  function weeksOdd(){ return range(1, MAX_WEEK).filter(function(w){ return w % 2 === 1; }); }
+  function weeksEven(){ return range(1, MAX_WEEK).filter(function(w){ return w % 2 === 0; }); }
+
+  /* ---------------- 假数据 ---------------- */
+  function course(name, day, start, end, weeks){
+    return { name:name, day:day, start:start, end:end, weeks:weeks };
+  }
+
+  var PEOPLE = [
+    { id:'p1', name:'张传山', meta:'台务 · 13 门课', courses:[
+      course('嵌入式操作系统', 1, 1, 2, weeksAll()),
+      course('单片机原理', 2, 5, 6, weeksAll()),
+      course('物联网通信', 2, 7, 8, weeksAll()),
+      course('计算机网络', 3, 1, 2, weeksAll()),
+      course('嵌入式软件工程', 5, 3, 4, weeksOdd())
+    ]},
+    { id:'p2', name:'李明', meta:'记者部 · 8 门课', courses:[
+      course('新闻采访', 1, 1, 4, weeksAll()),
+      course('传播学概论', 4, 5, 6, weeksAll()),
+      course('摄影基础', 6, 1, 2, weeksAll())
+    ]},
+    { id:'p3', name:'王雨欣', meta:'记者部 · 9 门课', courses:[
+      course('影视后期', 2, 1, 2, weeksAll()),
+      course('播音主持', 3, 5, 6, weeksAll()),
+      course('非线性编辑', 5, 5, 8, weeksEven())
+    ]},
+    { id:'p4', name:'陈静', meta:'学生会 · 10 门课', courses:[
+      course('高等数学', 1, 5, 6, weeksAll()),
+      course('大学物理', 4, 1, 2, weeksAll()),
+      course('线性代数', 5, 7, 8, weeksAll())
+    ]},
+    { id:'p5', name:'刘洋', meta:'外校双学位 · 3 门课', courses:[
+      course('第二专业课程', 3, 9, 10, weeksAll()),
+      course('网络选修', 6, 5, 6, weeksAll())
+    ]}
+  ];
+
+  /* 预置两条，方便立刻看到效果 */
+  var MANUALS = [
+    { id:'m1', type:'busy', who:['p2'], days:[3], periods:[9,10], weekMode:'all',
+      weeks:weeksAll(), label:'部门例会' },
+    { id:'m2', type:'free', who:['p1'], days:[2], periods:[5,6], weekMode:'all',
+      weeks:weeksAll(), label:'老师调课' }
+  ];
+
+  /* ---------------- 状态 ---------------- */
+  var state = {
+    selected: new Set(PEOPLE.map(function(p){ return p.id; })),
+    week: 'all'
+  };
+
+  var draft = null;
+  var manualSeq = 100;
+
+  /* ---------------- 计算 ---------------- */
+  function weekMatches(entry, week){
+    if(week === 'all') return entry.weeks.length > 0;
+    return entry.weeks.indexOf(week) !== -1;
+  }
+
+  /** 该人该时段是否被手动安排影响：返回 'busy' / 'free' / null */
+  function manualHit(personId, day, period, week){
+    var hit = null;
+    MANUALS.forEach(function(m){
+      if(m.who.indexOf(personId) === -1) return;
+      if(m.days.indexOf(day) === -1) return;
+      if(m.periods.indexOf(period) === -1) return;
+      if(!weekMatches(m, week)) return;
+      hit = m.type;
+    });
+    return hit;
+  }
+
+  function courseBusy(person, day, period, week){
+    return person.courses.some(function(c){
+      if(c.day !== day) return false;
+      if(period < c.start || period > c.end) return false;
+      if(week === 'all') return c.weeks.length > 0;
+      return c.weeks.indexOf(week) !== -1;
+    });
+  }
+
+  /** 某人某时段是否有空（手动安排优先于课表） */
+  function isFree(person, day, period, week){
+    var hit = manualHit(person.id, day, period, week);
+    if(hit === 'busy') return false;
+    if(hit === 'free') return true;
+    return !courseBusy(person, day, period, week);
+  }
+
+  function selectedPeople(){
+    return PEOPLE.filter(function(p){ return state.selected.has(p.id); });
+  }
+
+  /* ---------------- 渲染：人员 ---------------- */
+  function renderPeople(){
+    var box = document.getElementById('people');
+    box.innerHTML = PEOPLE.map(function(p){
+      var on = state.selected.has(p.id);
+      return '<label class="person">' +
+        '<input type="checkbox" data-person="' + p.id + '"' + (on ? ' checked' : '') + '>' +
+        '<span class="avatar">' + p.name.slice(0, 1) + '</span>' +
+        '<span class="person-names"><span class="person-name">' + p.name + '</span>' +
+        '<span class="person-meta">' + p.meta + '</span></span>' +
+        '</label>';
+    }).join('');
+  }
+
+  /* ---------------- 渲染：网格 ---------------- */
+  function renderGrid(){
+    var people = selectedPeople();
+    var total = people.length;
+    var html = '';
+    var touchedCount = 0;
+
+    GROUPS.forEach(function(g){
+      html += '<tr class="group-row"><td colspan="8">' + g.label + '</td></tr>';
+      for(var period = g.from; period <= g.to; period++){
+        html += '<tr><td class="period-cell">第' + period + '节</td>';
+        for(var day = 1; day <= 7; day++){
+          var free = 0;
+          var touched = false;
+          people.forEach(function(p){
+            if(isFree(p, day, period, state.week)) free++;
+            if(manualHit(p.id, day, period, state.week)) touched = true;
+          });
+          if(touched) touchedCount++;
+
+          var cls = 'slot';
+          var inner = '';
+          var style = '';
+          if(free === 0){
+            cls += ' none';
+            inner = '<div class="cell-sub">无</div>';
+          } else {
+            var ratio = total > 0 ? free / total : 0;
+            cls += (free === total ? ' full' : ' some');
+            style = ' style="--mix:' + Math.max(12, Math.round(ratio * 72)) + '%"';
+            inner = '<div class="cell-big">' + free + '</div><div class="cell-sub">/' + total + '</div>';
+          }
+          if(touched) cls += ' touched';
+
+          html += '<td class="' + cls + '" data-day="' + day + '" data-period="' + period + '"' + style + '>' +
+                  inner + '</td>';
+        }
+        html += '</tr>';
+      }
+    });
+
+    document.getElementById('grid-body').innerHTML = html;
+
+    var weekLabel = state.week === 'all' ? '全程' : '第 ' + state.week + ' 周';
+    document.getElementById('summary').innerHTML =
+      weekLabel + ' · 已选 <strong>' + total + '</strong> 人 · ' +
+      '手动安排 <strong>' + MANUALS.length + '</strong> 条' +
+      (touchedCount ? '（影响 ' + touchedCount + ' 个时段）' : '');
+  }
+
+  /* ---------------- 渲染：特殊安排列表 ---------------- */
+  function describe(entry){
+    var who = entry.who.map(function(id){
+      var p = PEOPLE.filter(function(x){ return x.id === id; })[0];
+      return p ? p.name : '?';
+    });
+    var dayText = entry.days.length === 7 ? '每天' : entry.days.map(function(d){ return DAYS[d-1]; }).join('、');
+    var periodText = entry.periods.length === 1
+      ? '第' + entry.periods[0] + '节'
+      : '第' + Math.min.apply(null, entry.periods) + '–' + Math.max.apply(null, entry.periods) + '节';
+    var weekText = entry.weekMode === 'all' ? '全部周'
+      : entry.weekMode === 'odd' ? '单周' : '双周';
+    return {
+      who: who.join('、'),
+      when: dayText + ' · ' + periodText + ' · ' + weekText
+    };
+  }
+
+  function renderManual(){
+    var box = document.getElementById('manual-list');
+    document.getElementById('manual-count').textContent = MANUALS.length ? '(' + MANUALS.length + ')' : '';
+
+    if(!MANUALS.length){
+      box.innerHTML = '<div class="manual-empty">还没有特殊安排。<br>点上方「＋ 添加特殊安排」，或直接点网格里的格子。</div>';
+      return;
+    }
+    box.innerHTML = MANUALS.map(function(m){
+      var d = describe(m);
+      var tagCls = m.type === 'busy' ? 'busy' : 'free';
+      var tagText = m.type === 'busy' ? '避开' : '可用';
+      return '<div class="mi">' +
+        '<div class="mi-top">' +
+          '<span class="tag ' + tagCls + '">' + tagText + '</span>' +
+          '<span class="mi-label">' + escapeHtml(m.label || '未命名') + '</span>' +
+          '<button class="mi-del" data-del="' + m.id + '" title="删除">✕</button>' +
+        '</div>' +
+        '<div class="mi-line"><span class="mi-who">' + escapeHtml(d.who) + '</span></div>' +
+        '<div class="mi-line">' + escapeHtml(d.when) + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function escapeHtml(text){
+    return String(text == null ? '' : text)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function renderAll(){
+    renderPeople();
+    renderGrid();
+    renderManual();
+  }
+
+  /* ---------------- 周次下拉 ---------------- */
+  function buildWeekSelect(){
+    var sel = document.getElementById('week-select');
+    var html = '<option value="all">全程有空</option>';
+    for(var w = 1; w <= MAX_WEEK; w++) html += '<option value="' + w + '">第 ' + w + ' 周</option>';
+    sel.innerHTML = html;
+    sel.value = 'all';
+  }
+
+  /* ---------------- 弹窗：选项渲染 ---------------- */
+  var LABELS = ['部门例会', '值班', '请假', '停课', '临时活动', '校运会'];
+
+  function renderDraftOptions(){
+    // 谁
+    document.getElementById('who-chips').innerHTML = PEOPLE.map(function(p){
+      var on = draft.who.indexOf(p.id) !== -1;
+      return '<button class="chip' + (on ? ' on' : '') + '" data-who="' + p.id + '">' + p.name + '</button>';
+    }).join('');
+
+    // 星期
+    document.getElementById('day-chips').innerHTML = DAYS.map(function(name, index){
+      var day = index + 1;
+      var on = draft.days.indexOf(day) !== -1;
+      return '<button class="chip' + (on ? ' on' : '') + '" data-day="' + day + '">' + name + '</button>';
+    }).join('');
+
+    // 节次（分组）
+    document.getElementById('period-chips').innerHTML = GROUPS.map(function(g){
+      var chips = '';
+      for(var period = g.from; period <= g.to; period++){
+        var on = draft.periods.indexOf(period) !== -1;
+        chips += '<button class="chip' + (on ? ' on' : '') + '" data-period="' + period + '">' +
+                 '第' + period + '节</button>';
+      }
+      return '<div class="chip-group"><span class="chip-group-label">' + g.label + '</span>' +
+             '<div class="chips">' + chips + '</div></div>';
+    }).join('');
+
+    // 原因
+    document.getElementById('label-chips').innerHTML = LABELS.map(function(name){
+      var on = draft.label === name;
+      return '<button class="chip' + (on ? ' on' : '') + '" data-label="' + name + '">' + name + '</button>';
+    }).join('');
+
+    // 类型
+    var seg = document.getElementById('type-seg');
+    Array.prototype.forEach.call(seg.children, function(btn){
+      var isBusy = btn.getAttribute('data-type') === 'busy';
+      var on = draft.type === (isBusy ? 'busy' : 'free');
+      btn.className = on ? (isBusy ? 'on' : 'on free-on') : '';
+    });
+    document.getElementById('type-hint').textContent = draft.type === 'busy'
+      ? '「有事」会让人在这段时间不算有空，例如例会、值班、临时活动。'
+      : '「可用」表示这段时间其实没课（停课、调课、请假），会把人算成有空。';
+
+    // 周次
+    Array.prototype.forEach.call(document.getElementById('week-seg').children, function(btn){
+      btn.className = btn.getAttribute('data-week') === draft.weekMode ? 'on' : '';
+    });
+
+    // 标题与预览
+    document.getElementById('modal-title').textContent = draft.editing ? '编辑特殊安排' : '添加特殊安排';
+    renderPreview();
+  }
+
+  function renderPreview(){
+    var who = draft.who.length
+      ? draft.who.map(function(id){
+          var p = PEOPLE.filter(function(x){ return x.id === id; })[0];
+          return p ? p.name : '?';
+        }).join('、')
+      : '（还没选人）';
+    var dayText = draft.days.length ? draft.days.map(function(d){ return DAYS[d-1]; }).join('、') : '（还没选星期）';
+    var periodText = draft.periods.length
+      ? '第' + Math.min.apply(null, draft.periods) + '–' + Math.max.apply(null, draft.periods) + '节'
+      : '（还没选节次）';
+    var weekText = draft.weekMode === 'all' ? '全部周' : (draft.weekMode === 'odd' ? '单周' : '双周');
+    var action = draft.type === 'busy' ? '不算有空' : '算作有空';
+
+    document.getElementById('preview').innerHTML =
+      '<b>' + escapeHtml(who) + '</b> 在 <b>' + escapeHtml(dayText) + ' ' + escapeHtml(periodText) +
+      '</b>（' + weekText + '）<b>' + action + '</b>' +
+      (draft.periods.length && draft.days.length
+        ? '，影响 ' + (draft.days.length * draft.periods.length) + ' 个时段'
+        : '');
+  }
+
+  /* ---------------- 弹窗：开关 ---------------- */
+  function openModal(prefill){
+    prefill = prefill || {};
+    draft = {
+      type: 'busy',
+      who: prefill.who || Array.from(state.selected),
+      days: prefill.days || [],
+      periods: prefill.periods || [],
+      weekMode: 'all',
+      label: '',
+      editing: false
+    };
+    document.getElementById('label-input').value = '';
+    document.getElementById('modal').hidden = false;
+    renderDraftOptions();
+    document.getElementById('label-input').focus();
+  }
+
+  function closeModal(){
+    document.getElementById('modal').hidden = true;
+    draft = null;
+  }
+
+  function saveModal(){
+    if(!draft) return;
+    if(!draft.who.length || !draft.days.length || !draft.periods.length){
+      document.getElementById('preview').innerHTML =
+        '<span style="color:var(--win-danger)">还需要选：' +
+        [!draft.who.length && '谁', !draft.days.length && '星期', !draft.periods.length && '节次']
+          .filter(Boolean).join('、') + '</span>';
+      return;
+    }
+    var typed = document.getElementById('label-input').value.trim();
+    var weeks = draft.weekMode === 'all' ? weeksAll()
+      : draft.weekMode === 'odd' ? weeksOdd() : weeksEven();
+
+    MANUALS.push({
+      id: 'm' + (manualSeq++),
+      type: draft.type,
+      who: draft.who.slice(),
+      days: draft.days.slice().sort(function(a, b){ return a - b; }),
+      periods: draft.periods.slice().sort(function(a, b){ return a - b; }),
+      weekMode: draft.weekMode,
+      weeks: weeks,
+      label: typed || draft.label || (draft.type === 'busy' ? '有事' : '有空')
+    });
+    closeModal();
+    renderAll();
+    toast('已添加：' + MANUALS[MANUALS.length - 1].label);
+  }
+
+  /* ---------------- 小提示 ---------------- */
+  var toastTimer = null;
+  function toast(text){
+    var el = document.getElementById('toast');
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'toast';
+      el.style.cssText = 'position:fixed; left:50%; bottom:28px; transform:translateX(-50%); z-index:40;' +
+        'background:var(--win-surface); border:1px solid var(--win-border); border-radius:6px;' +
+        'box-shadow:0 6px 20px rgba(0,0,0,.2); padding:8px 14px; font-size:13px;';
+      document.body.appendChild(el);
+    }
+    el.textContent = text;
+    el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ el.hidden = true; }, 2400);
+  }
+
+  /* ---------------- 事件绑定 ---------------- */
+  document.getElementById('people').addEventListener('change', function(e){
+    var id = e.target.getAttribute('data-person');
+    if(!id) return;
+    if(e.target.checked) state.selected.add(id); else state.selected.delete(id);
+    renderGrid();
+  });
+
+  document.getElementById('week-select').addEventListener('change', function(){
+    state.week = this.value === 'all' ? 'all' : parseInt(this.value, 10);
+    renderGrid();
+  });
+
+  document.getElementById('btn-all').addEventListener('click', function(){
+    state.selected = new Set(PEOPLE.map(function(p){ return p.id; }));
+    renderAll();
+  });
+  document.getElementById('btn-none').addEventListener('click', function(){
+    state.selected.clear();
+    renderAll();
+  });
+
+  document.getElementById('btn-add').addEventListener('click', function(){ openModal(); });
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('modal-cancel').addEventListener('click', closeModal);
+  document.getElementById('modal-save').addEventListener('click', saveModal);
+  document.getElementById('modal').addEventListener('click', function(e){
+    if(e.target === this) closeModal();
+  });
+
+  // 点格子 → 带上星期/节次快速添加
+  document.getElementById('grid-body').addEventListener('click', function(e){
+    var cell = e.target.closest ? e.target.closest('td.slot') : null;
+    if(!cell) return;
+    openModal({
+      days: [parseInt(cell.getAttribute('data-day'), 10)],
+      periods: [parseInt(cell.getAttribute('data-period'), 10)]
+    });
+  });
+
+  // 类型
+  document.getElementById('type-seg').addEventListener('click', function(e){
+    var btn = e.target.closest ? e.target.closest('button[data-type]') : null;
+    if(!btn || !draft) return;
+    draft.type = btn.getAttribute('data-type');
+    renderDraftOptions();
+  });
+
+  // 周次
+  document.getElementById('week-seg').addEventListener('click', function(e){
+    var btn = e.target.closest ? e.target.closest('button[data-week]') : null;
+    if(!btn || !draft) return;
+    draft.weekMode = btn.getAttribute('data-week');
+    renderDraftOptions();
+  });
+
+  // 人员 / 星期 / 节次 / 原因 的 chip 组
+  document.querySelector('.modal-body').addEventListener('click', function(e){
+    var btn = e.target.closest ? e.target.closest('button') : null;
+    if(!btn || !draft) return;
+
+    if(btn.hasAttribute('data-who')){
+      toggle(draft.who, btn.getAttribute('data-who'));
+    } else if(btn.hasAttribute('data-day')){
+      toggle(draft.days, parseInt(btn.getAttribute('data-day'), 10));
+    } else if(btn.hasAttribute('data-period')){
+      toggle(draft.periods, parseInt(btn.getAttribute('data-period'), 10));
+    } else if(btn.hasAttribute('data-label')){
+      draft.label = draft.label === btn.getAttribute('data-label') ? '' : btn.getAttribute('data-label');
+      document.getElementById('label-input').value = draft.label;
+    } else if(btn.hasAttribute('data-quick')){
+      var quick = btn.getAttribute('data-quick');
+      if(quick === 'clear'){
+        draft.periods = [];
+      } else {
+        var parts = quick.split('-');
+        range(parseInt(parts[0], 10), parseInt(parts[1], 10)).forEach(function(p){
+          if(draft.periods.indexOf(p) === -1) draft.periods.push(p);
+        });
+        draft.periods.sort(function(a, b){ return a - b; });
+      }
+    } else {
+      return;
+    }
+    renderDraftOptions();
+  });
+
+  document.getElementById('label-input').addEventListener('input', function(){
+    if(!draft) return;
+    var typed = this.value.trim();
+    draft.label = LABELS.indexOf(typed) !== -1 ? typed : '';
+    renderDraftOptions();
+  });
+
+  function toggle(list, value){
+    var index = list.indexOf(value);
+    if(index === -1) list.push(value); else list.splice(index, 1);
+  }
+
+  // 删除
+  document.getElementById('manual-list').addEventListener('click', function(e){
+    var btn = e.target.closest ? e.target.closest('[data-del]') : null;
+    if(!btn) return;
+    var id = btn.getAttribute('data-del');
+    MANUALS = MANUALS.filter(function(m){ return m.id !== id; });
+    renderAll();
+    toast('已删除');
+  });
+
+  /* ---------------- 启动 ---------------- */
+  buildWeekSelect();
+  renderAll();
+})();
+</script>
+</body>
+</html>

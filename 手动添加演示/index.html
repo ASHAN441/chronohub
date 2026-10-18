@@ -292,6 +292,33 @@
 .preview-line{ font-size:12px; color:var(--win-text-muted); line-height:1.7; }
 .preview-line b{ color:var(--win-text); }
 
+/* 已添加列表（复用「添加」按钮做管理） */
+.win-modal-card.wider{ max-height:90vh; display:flex; flex-direction:column; }
+#special-modal .win-modal-body{ overflow-y:auto; }
+.sp-manage{ border-top:1px solid var(--win-border); padding-top:12px; }
+.sp-manage-head{ display:flex; align-items:baseline; gap:8px; font-size:12.5px; margin-bottom:7px; }
+.sp-manage-count{ font-size:11.5px; color:var(--win-text-muted); }
+.sp-list{ display:flex; flex-direction:column; gap:6px; max-height:170px; overflow-y:auto; }
+.sp-empty{
+  font-size:12px; color:var(--win-text-muted); background:var(--win-surface-2);
+  border:1px dashed var(--win-border); border-radius:6px; padding:12px; text-align:center; line-height:1.8;
+}
+.sp-item{
+  display:flex; align-items:center; gap:9px; border:1px solid var(--win-border); border-radius:6px;
+  padding:7px 10px; background:var(--win-surface-2); font-size:12.5px;
+}
+.sp-item-who{ font-weight:600; flex:none; max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sp-item-when{ color:var(--win-text-muted); font-size:12px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sp-item-del{
+  margin-left:auto; flex:none; width:22px; height:22px; border:1px solid var(--win-border);
+  background:var(--win-surface); color:var(--win-text-muted); border-radius:5px; cursor:pointer;
+  font-size:12px; line-height:1; padding:0;
+}
+.sp-item-del:hover{
+  color:#c42b1c; border-color:color-mix(in srgb, #c42b1c 45%, var(--win-border));
+  background:color-mix(in srgb, #c42b1c 10%, var(--win-surface));
+}
+
 /* 演示专用：顶部提示条 + 新增按钮的高亮提示（真实应用里没有这两样） */
 .demo-bar{
   flex:none; display:flex; align-items:center; gap:10px; padding:6px 12px; font-size:12px;
@@ -316,9 +343,7 @@
 
 <div class="demo-bar">
   <b>界面演示</b>
-  <span>除工具栏那个高亮的「添加」按钮外，其余界面与现在完全一致</span>
-  <span style="margin-left:auto"></span>
-  <button id="demo-undo" type="button">撤销上一次添加</button>
+  <span>除工具栏那个高亮的「添加」按钮外，其余界面与现在完全一致。点它既能添加，也能删除已添加的条目。</span>
 </div>
 
 <div class="win-titlebar">
@@ -454,10 +479,19 @@
         <div class="preview-line" id="preview" style="margin-top:6px"></div>
       </div>
 
+      <!-- 复用同一个按钮做管理：已添加的条目在这里，可直接删除 -->
+      <div class="sp-manage">
+        <div class="sp-manage-head">
+          <b>已添加</b>
+          <span class="sp-manage-count" id="sp-count"></span>
+        </div>
+        <div class="sp-list" id="sp-list"></div>
+      </div>
+
     </div>
 
     <div class="win-modal-foot" style="display:flex;justify-content:flex-end;gap:8px;padding:0 14px 14px">
-      <button class="tb-btn" id="special-cancel" type="button">取消</button>
+      <button class="tb-btn" id="special-cancel" type="button">关闭</button>
       <button class="tb-btn primary" id="special-save" type="button">添加</button>
     </div>
   </div>
@@ -629,6 +663,7 @@
     draft = { who: [], days: [], periods: [], weeks: [] };
     document.getElementById('special-modal').hidden = false;
     renderDraft();
+    renderSpecialList();
   }
 
   function closeModal(){
@@ -713,12 +748,17 @@
       weeks: draft.weeks.slice().sort(function(a, b){ return a - b; })
     });
 
-    var count = draft.who.length;
-    closeModal();
+    var added = SPECIALS[SPECIALS.length - 1];
+    var count = added.who.length;
+
+    // 不关闭弹窗：下半部分要能立刻看到刚加的条目，也方便连续添加。
+    // 但要把表单清空，避免顺手点了两次「添加」重复记一条。
+    draft = { who: [], days: [], periods: [], weeks: [] };
+    renderDraft();
+    renderSpecialList();
     renderGrid();
-    toast('已添加：' + count + ' 人 · ' +
-      draftDaysText(SPECIALS[SPECIALS.length - 1]) + ' · ' +
-      draftPeriodsText(SPECIALS[SPECIALS.length - 1]));
+    updateAddButton();
+    toast('已添加：' + count + ' 人 · ' + draftDaysText(added) + ' · ' + draftPeriodsText(added));
   }
 
   function draftDaysText(entry){
@@ -726,6 +766,42 @@
   }
   function draftPeriodsText(entry){
     return '第' + Math.min.apply(null, entry.periods) + '–' + Math.max.apply(null, entry.periods) + '节';
+  }
+
+  /** 已添加列表：复用「添加」按钮的第二半功能 */
+  function renderSpecialList(){
+    var box = document.getElementById('sp-list');
+    document.getElementById('sp-count').textContent = SPECIALS.length ? SPECIALS.length + ' 条' : '';
+
+    if(!SPECIALS.length){
+      box.innerHTML = '<div class="sp-empty">还没有添加。上面选好人名、星期、节次、周次后点「添加」，条目会出现在这里。</div>';
+      return;
+    }
+
+    box.innerHTML = SPECIALS.map(function(s, index){
+      var names = s.who.map(function(id){
+        var hit = PEOPLE.filter(function(x){ return x.id === id; })[0];
+        return hit ? hit.name : '?';
+      }).join('、');
+      var days = s.days.map(function(d){ return DAYS[d-1]; }).join('、');
+      var periods = '第' + Math.min.apply(null, s.periods) + '–' + Math.max.apply(null, s.periods) + '节';
+      var weeks = s.weeks.length === MAX_WEEK ? '全部周' : s.weeks.join('、') + ' 周';
+
+      return '<div class="sp-item">' +
+        '<span class="sp-item-who">' + escapeHtml(names) + '</span>' +
+        '<span class="sp-item-when">' + escapeHtml(days + ' · ' + periods + ' · ' + weeks) + '</span>' +
+        '<button class="sp-item-del" data-del="' + index + '" type="button" title="删除">✕</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  /** 按钮上带条数，免得"加过没有"只能靠打开弹窗确认 */
+  function updateAddButton(){
+    var btn = document.getElementById('add-special-btn');
+    btn.textContent = SPECIALS.length ? '添加 · ' + SPECIALS.length : '添加';
+    btn.title = SPECIALS.length
+      ? '已添加 ' + SPECIALS.length + ' 条，点此添加或删除'
+      : '添加特殊安排';
   }
 
   function escapeHtml(text){
@@ -769,7 +845,20 @@
 
   document.querySelector('#special-modal .win-modal-body').addEventListener('click', function(e){
     var btn = e.target.closest ? e.target.closest('button') : null;
-    if(!btn || !draft) return;
+    if(!btn) return;
+
+    // 先处理删除：它不依赖 draft
+    if(btn.hasAttribute('data-del')){
+      var removeIndex = parseInt(btn.getAttribute('data-del'), 10);
+      SPECIALS.splice(removeIndex, 1);
+      renderSpecialList();
+      renderGrid();
+      updateAddButton();
+      toast('已删除一条');
+      return;
+    }
+
+    if(!draft) return;
 
     if(btn.hasAttribute('data-who')){
       toggle(draft.who, btn.getAttribute('data-who'));
@@ -787,13 +876,6 @@
     renderDraft();
   });
 
-  document.getElementById('demo-undo').addEventListener('click', function(){
-    if(!SPECIALS.length){ toast('还没有添加过'); return; }
-    SPECIALS.pop();
-    renderGrid();
-    toast('已撤销上一次添加');
-  });
-
   document.addEventListener('keydown', function(e){
     if(e.key === 'Escape' && draft) closeModal();
   });
@@ -801,6 +883,7 @@
   /* ---------- 启动 ---------- */
   buildWeekSelect();
   renderAll();
+  updateAddButton();
 })();
 </script>
 </body>

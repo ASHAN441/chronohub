@@ -285,6 +285,9 @@
       padding:8px; background:var(--win-surface-2); display:flex; flex-wrap:wrap; gap:6px;
     }
     .sp-empty-inline{ font-size:12px; color:var(--win-text-muted); }
+    .sp-picker-empty{ font-size:12px; color:var(--win-text-muted); padding:2px; }
+    .sp-search{ width:100%; }
+    .sp-picked{ color:var(--win-accent); font-size:11.5px; margin-left:6px; }
     .sp-note{
       font-size:11.5px; color:var(--win-text-muted); background:var(--win-surface-2);
       border:1px dashed var(--win-border); border-radius:6px; padding:8px 11px; line-height:1.7;
@@ -535,7 +538,11 @@
       </div>
       <div class="win-modal-body sp-body" style="text-align:left;align-items:stretch">
         <div class="sp-field">
-          <span class="sp-label"><b>人名</b>（从已导入的课表中选择，可多选）</span>
+          <span class="sp-label"><b>人名</b>（从已导入的课表中选择，可多选）
+            <span class="sp-picked" id="sp-who-count"></span>
+          </span>
+          <input class="win-input sp-search" id="sp-who-search" type="search"
+                 placeholder="搜索姓名或学号" autocomplete="off">
           <div class="sp-picker" id="sp-who"></div>
         </div>
         <div class="sp-field">
@@ -2878,6 +2885,8 @@
 
       function openSpecialModal(){
         specialDraft = { who: [], days: [], periods: [], weeks: [] };
+        specialSearch = '';
+        document.getElementById('sp-who-search').value = '';
         document.getElementById('special-modal').hidden = false;
         renderSpecialDraft();
         renderSpecialList();
@@ -2888,19 +2897,46 @@
         specialDraft = null;
       }
 
+      var specialSearch = '';
+
+      /** 只重绘人名区：搜索框输入时不该把星期/节次/周次也重建一遍 */
+      function renderWhoChips(){
+        if(!specialDraft) return;
+
+        var people = state.people.filter(function(p){ return personKey(p); });
+        var keyword = specialSearch.trim().toLowerCase();
+
+        var matched = people.filter(function(p){
+          if(!keyword) return true;
+          var name = String(p.name || '').toLowerCase();
+          var studentId = String(p.student_id || '').toLowerCase();
+          return name.indexOf(keyword) !== -1 || studentId.indexOf(keyword) !== -1;
+        });
+
+        var box = document.getElementById('sp-who');
+        if(!people.length){
+          box.innerHTML = '<span class="sp-picker-empty">还没有导入课表</span>';
+        } else if(!matched.length){
+          box.innerHTML = '<span class="sp-picker-empty">没有匹配「' +
+            esc(specialSearch.trim()) + '」的人</span>';
+        } else {
+          box.innerHTML = matched.map(function(p){
+            var key = personKey(p);
+            var on = specialDraft.who.indexOf(key) !== -1;
+            return '<button class="sp-chip' + (on ? ' on' : '') + '" data-sp-who="' + esc(key) + '" type="button">' +
+                   esc(p.name || key) + '</button>';
+          }).join('');
+        }
+
+        // 选中的人可能不在当前搜索结果里，这里明确显示已选数量，避免误以为漏选
+        var count = specialDraft.who.length;
+        document.getElementById('sp-who-count').textContent = count ? '已选 ' + count + ' 人' : '';
+      }
+
       function renderSpecialDraft(){
         if(!specialDraft) return;
 
-        // 人名来自已导入的课表
-        var people = state.people.filter(function(p){ return personKey(p); });
-        document.getElementById('sp-who').innerHTML = people.length
-          ? people.map(function(p){
-              var key = personKey(p);
-              var on = specialDraft.who.indexOf(key) !== -1;
-              return '<button class="sp-chip' + (on ? ' on' : '') + '" data-sp-who="' + esc(key) + '" type="button">' +
-                     esc(p.name || key) + '</button>';
-            }).join('')
-          : '<span class="sp-empty-inline">还没有导入课表</span>';
+        renderWhoChips();
 
         document.getElementById('sp-day').innerHTML = DAYS.map(function(name, index){
           var day = index + 1;
@@ -3049,6 +3085,12 @@
         document.getElementById('special-cancel').addEventListener('click', closeSpecialModal);
         document.getElementById('special-backdrop').addEventListener('click', closeSpecialModal);
         document.getElementById('special-save').addEventListener('click', saveSpecial);
+
+        // 人名搜索：只重绘人名区，不动其他字段
+        document.getElementById('sp-who-search').addEventListener('input', function(){
+          specialSearch = this.value;
+          renderWhoChips();
+        });
 
         document.querySelector('#special-modal .win-modal-body').addEventListener('click', function(e){
           var btn = e.target.closest ? e.target.closest('button') : null;

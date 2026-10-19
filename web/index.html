@@ -266,7 +266,7 @@
     .about-cell{ border:1px solid var(--win-border); border-radius:8px; padding:10px 12px; background:var(--win-surface); }
     .about-cell b{ display:block; font-size:12px; margin-bottom:3px; }
     .about-cell span{ font-size:12px; color:var(--win-text-muted); line-height:1.6; }
-    /* ===== 手动添加的特殊安排（v3.1.2 新增） ===== */
+    /* ===== 手动添加的特殊安排（v3.1 新增） ===== */
     /* 类名统一加 sp- 前缀：应用里已有 .chip（账号页「课表已入库」标签），不能复用 */
     #special-modal .win-modal-card{ max-height:90vh; display:flex; flex-direction:column; }
     #special-modal .sp-body{ display:flex; flex-direction:column; gap:14px; overflow-y:auto; }
@@ -493,7 +493,7 @@
           <div class="about-box">
             <div class="about-big-logo">空</div>
             <div class="about-big-name" id="about-big-name">空课表PRO</div>
-            <div class="about-big-version" id="about-big-version">v3.1.2</div>
+            <div class="about-big-version" id="about-big-version">v3.1</div>
             <div class="about-note" id="about-note"></div>
             <div class="about-grid">
               <div class="about-cell"><b>账号与安全</b><span>账号存 SQLite，密码用 Windows DPAPI 加密</span></div>
@@ -794,7 +794,7 @@
       ];
 
       var DEFAULT_APP_INFO = {
-        name:'空课表PRO', version:'3.1.2', org:'SYNUTV',
+        name:'空课表PRO', version:'3.1', org:'SYNUTV',
         developer:'阿山', contact:'ashan441@163.com',
         copyright:'© 2026 阿山',
         merged_from:'由「教务系统管理器 v1.0.0」与「多人空课表 v2.1」合并'
@@ -2865,7 +2865,7 @@
       // 自动化自检用的钩子：本文件所有函数都在 IIFE 内，外部（含 WebView
       // 的 evaluate_js）访问不到，这里显式暴露几个只读入口，不影响正常功能。
       /* =========================================================
-         手动添加的特殊安排（v3.1.2 新增）
+         手动添加的特殊安排（v3.1 新增）
          课表 PDF 体现不了的情况：例会、值班、调课停课…
          只做「占用」方向，统计时按没空处理。
          ========================================================= */

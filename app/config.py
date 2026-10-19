@@ -2,7 +2,7 @@
 
 # 产品名
 APP_NAME = "空课表PRO"
-VERSION = "3.1.2"
+VERSION = "3.1"
 
 # 组织 / 项目线标识。产品名独立，但组织标识仍保留在「关于」页展示。
 ORG_NAME = "SYNUTV"

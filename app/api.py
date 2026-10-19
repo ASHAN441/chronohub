@@ -18,6 +18,12 @@ from .people_store import (
     save_people,
 )
 from .qtbridge import QtBridge, clear_last_error, last_error
+from .specials_store import (
+    SPECIALS_FILE,
+    load_specials,
+    normalize as normalize_special,
+    save_specials,
+)
 from .system_urls import DEFAULT_LOGIN_URL, SYSTEM_URLS
 
 
@@ -29,6 +35,7 @@ class Api:
         data_path: str = None,
         groups_path: str = None,
         accounts_db_path: str = None,
+        specials_path: str = None,
     ):
         self._window = None
         self._qt_app = None
@@ -36,8 +43,19 @@ class Api:
         self._browser = None
         self.data_path = data_path or DATA_FILE
         self.groups_path = groups_path or GROUPS_FILE
+        # specials 默认跟 people 放在同一个目录：这样注入 data_path 的测试/自定义
+        # 数据目录会自动隔离，不会去读写真实的 data/specials.json。
+        if specials_path:
+            self.specials_path = specials_path
+        elif data_path:
+            self.specials_path = os.path.join(
+                os.path.dirname(os.path.abspath(data_path)), "specials.json"
+            )
+        else:
+            self.specials_path = SPECIALS_FILE
         self.people, self.parser_version = load_data(self.data_path)
         self.groups = load_groups(self.groups_path)
+        self.specials = load_specials(self.specials_path)
         self._lock = threading.Lock()
         # 人员数据的读写锁。为什么必须有：批量导入跑在后台线程，而
         # 「导出课表 → 自动入库」走 js_api 子线程，两者可能同时 _merge 并写同一个
@@ -410,6 +428,41 @@ class Api:
                 self.people = [p for i, p in enumerate(self.people) if i not in targets]
                 self._save_people()
         return {"groups": self.get_groups(), "people": self.get_people()}
+
+    # ================= 手动添加的特殊安排 =================
+    #
+    # 课表 PDF 体现不了的情况（例会、值班、调课停课）由用户手动补进来，
+    # 统计时按「没空」处理。存独立的 specials.json，不动 people.json。
+
+    def get_specials(self) -> dict:
+        with self._people_lock:
+            return {"specials": [dict(item) for item in self.specials]}
+
+    def add_special(self, who, days, periods, weeks) -> dict:
+        entry = normalize_special(
+            {"who": who, "days": days, "periods": periods, "weeks": weeks}
+        )
+        if entry is None:
+            return {
+                "ok": False,
+                "error": "人名、星期、节次、周次都不能为空",
+                "specials": self.get_specials()["specials"],
+            }
+        with self._people_lock:
+            self.specials.append(entry)
+            save_specials(self.specials, self.specials_path)
+            snapshot = [dict(item) for item in self.specials]
+        return {"ok": True, "specials": snapshot}
+
+    def remove_special(self, special_id) -> dict:
+        target = str(special_id or "")
+        with self._people_lock:
+            before = len(self.specials)
+            self.specials = [s for s in self.specials if s["id"] != target]
+            if len(self.specials) != before:
+                save_specials(self.specials, self.specials_path)
+            snapshot = [dict(item) for item in self.specials]
+        return {"ok": True, "specials": snapshot}
 
     @staticmethod
     def _same_person(existing, person) -> bool:

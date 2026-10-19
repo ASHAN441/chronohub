@@ -266,6 +266,55 @@
     .about-cell{ border:1px solid var(--win-border); border-radius:8px; padding:10px 12px; background:var(--win-surface); }
     .about-cell b{ display:block; font-size:12px; margin-bottom:3px; }
     .about-cell span{ font-size:12px; color:var(--win-text-muted); line-height:1.6; }
+    /* ===== 手动添加的特殊安排（v3.1.2 新增） ===== */
+    /* 类名统一加 sp- 前缀：应用里已有 .chip（账号页「课表已入库」标签），不能复用 */
+    #special-modal .win-modal-card{ max-height:90vh; display:flex; flex-direction:column; }
+    #special-modal .sp-body{ display:flex; flex-direction:column; gap:14px; overflow-y:auto; }
+    .sp-field{ display:flex; flex-direction:column; gap:6px; }
+    .sp-label{ font-size:12px; color:var(--win-text-muted); }
+    .sp-label b{ color:var(--win-text); font-weight:600; }
+    .sp-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+    .sp-chip{
+      border:1px solid var(--win-border); background:var(--win-surface); color:var(--win-text);
+      border-radius:999px; padding:4px 11px; font-size:12.5px; cursor:pointer; font-family:inherit;
+    }
+    .sp-chip:hover{ background:var(--win-surface-3); }
+    .sp-chip.on{ background:var(--win-accent); color:var(--win-accent-fg); border-color:transparent; }
+    .sp-picker{
+      max-height:132px; overflow-y:auto; border:1px solid var(--win-border); border-radius:6px;
+      padding:8px; background:var(--win-surface-2); display:flex; flex-wrap:wrap; gap:6px;
+    }
+    .sp-empty-inline{ font-size:12px; color:var(--win-text-muted); }
+    .sp-note{
+      font-size:11.5px; color:var(--win-text-muted); background:var(--win-surface-2);
+      border:1px dashed var(--win-border); border-radius:6px; padding:8px 11px; line-height:1.7;
+    }
+    .sp-note b{ color:var(--win-text); }
+    .sp-preview{ font-size:12px; color:var(--win-text-muted); line-height:1.7; margin-top:6px; }
+    .sp-preview b{ color:var(--win-text); }
+    .sp-manage{ border-top:1px solid var(--win-border); padding-top:12px; }
+    .sp-manage-head{ display:flex; align-items:baseline; gap:8px; font-size:12.5px; margin-bottom:7px; }
+    .sp-count{ font-size:11.5px; color:var(--win-text-muted); }
+    .sp-list{ display:flex; flex-direction:column; gap:6px; max-height:170px; overflow-y:auto; }
+    .sp-empty{
+      font-size:12px; color:var(--win-text-muted); background:var(--win-surface-2);
+      border:1px dashed var(--win-border); border-radius:6px; padding:12px; text-align:center; line-height:1.8;
+    }
+    .sp-item{
+      display:flex; align-items:center; gap:9px; border:1px solid var(--win-border); border-radius:6px;
+      padding:7px 10px; background:var(--win-surface-2); font-size:12.5px;
+    }
+    .sp-item-who{ font-weight:600; flex:none; max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .sp-item-when{ color:var(--win-text-muted); font-size:12px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .sp-item-del{
+      margin-left:auto; flex:none; width:22px; height:22px; border:1px solid var(--win-border);
+      background:var(--win-surface); color:var(--win-text-muted); border-radius:5px; cursor:pointer;
+      font-size:12px; line-height:1; padding:0; font-family:inherit;
+    }
+    .sp-item-del:hover{
+      color:#c42b1c; border-color:color-mix(in srgb, #c42b1c 45%, var(--win-border));
+      background:color-mix(in srgb, #c42b1c 10%, var(--win-surface));
+    }
   </style>
 </head>
 <body>
@@ -312,6 +361,7 @@
   <div class="win-toolbar">
     <button class="tb-btn primary" id="import-btn" type="button">导入课表</button>
     <button class="tb-btn" id="export-btn" type="button">导出</button>
+    <button class="tb-btn" id="add-special-btn" type="button">添加</button>
     <span class="tb-sep"></span>
     <label class="tb-field">学期
       <select class="tb-select" id="semester-select"></select>
@@ -440,7 +490,7 @@
           <div class="about-box">
             <div class="about-big-logo">空</div>
             <div class="about-big-name" id="about-big-name">空课表PRO</div>
-            <div class="about-big-version" id="about-big-version">v3.1</div>
+            <div class="about-big-version" id="about-big-version">v3.1.2</div>
             <div class="about-note" id="about-note"></div>
             <div class="about-grid">
               <div class="about-cell"><b>账号与安全</b><span>账号存 SQLite，密码用 Windows DPAPI 加密</span></div>
@@ -471,6 +521,47 @@
       <div class="win-modal-foot" style="display:flex;justify-content:flex-end;gap:8px;padding:0 14px 14px">
         <button class="tb-btn" id="acct-modal-cancel" type="button">取消</button>
         <button class="tb-btn primary" id="acct-save" type="button">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 添加特殊安排：课表 PDF 体现不了的情况（例会 / 值班 / 调课停课） -->
+  <div class="win-modal" id="special-modal" hidden>
+    <div class="win-modal-backdrop" id="special-backdrop"></div>
+    <div class="win-modal-card wider">
+      <div class="win-modal-head">
+        <span>添加特殊安排</span>
+        <button class="win-modal-close" id="special-close" type="button" aria-label="关闭">✕</button>
+      </div>
+      <div class="win-modal-body sp-body" style="text-align:left;align-items:stretch">
+        <div class="sp-field">
+          <span class="sp-label"><b>人名</b>（从已导入的课表中选择，可多选）</span>
+          <div class="sp-picker" id="sp-who"></div>
+        </div>
+        <div class="sp-field">
+          <span class="sp-label"><b>星期</b></span>
+          <div class="sp-chips" id="sp-day"></div>
+        </div>
+        <div class="sp-field">
+          <span class="sp-label"><b>节次</b>（可多选）</span>
+          <div class="sp-chips" id="sp-period"></div>
+        </div>
+        <div class="sp-field">
+          <span class="sp-label"><b>周次</b>（可多选）</span>
+          <div class="sp-chips" id="sp-week"></div>
+        </div>
+        <div class="sp-note">
+          选定后，这些人在该时段会被记为 <b>没空</b>，统计里不再算作空闲。
+          <div class="sp-preview" id="sp-preview"></div>
+        </div>
+        <div class="sp-manage">
+          <div class="sp-manage-head"><b>已添加</b><span class="sp-count" id="sp-count"></span></div>
+          <div class="sp-list" id="sp-list"></div>
+        </div>
+      </div>
+      <div class="win-modal-foot" style="display:flex;justify-content:flex-end;gap:8px;padding:0 14px 14px">
+        <button class="tb-btn" id="special-cancel" type="button">关闭</button>
+        <button class="tb-btn primary" id="special-save" type="button">添加</button>
       </div>
     </div>
   </div>
@@ -696,13 +787,13 @@
       ];
 
       var DEFAULT_APP_INFO = {
-        name:'空课表PRO', version:'3.1', org:'SYNUTV',
+        name:'空课表PRO', version:'3.1.2', org:'SYNUTV',
         developer:'阿山', contact:'ashan441@163.com',
         copyright:'© 2026 阿山',
         merged_from:'由「教务系统管理器 v1.0.0」与「多人空课表 v2.1」合并'
       };
 
-      var state = { people: [], groups: [], selected: new Set(), semester: 'all', group: 'all', week: 1, search: '', sort: 'default' };
+      var state = { people: [], groups: [], selected: new Set(), semester: 'all', group: 'all', week: 1, search: '', sort: 'default', specials: [] };
 
       function esc(s){
         return String(s == null ? '' : s)
@@ -856,7 +947,26 @@
         return Array.from(state.selected).filter(function(i){ return vis[i]; }).sort(function(a,b){ return a-b; });
       }
 
+      /** 人员稳定标识：优先学号。不能用列表下标——导入/删除会让下标整体位移。 */
+      function personKey(person){
+        return String(person.student_id || person.name || '').trim();
+      }
+
+      /** 该人该时段是否被手动添加的「特殊安排」占用 */
+      function specialHit(person, day, period, week){
+        var key = personKey(person);
+        if(!key) return false;
+        return state.specials.some(function(entry){
+          if(entry.who.indexOf(key) === -1) return false;
+          if(entry.days.indexOf(day) === -1) return false;
+          if(entry.periods.indexOf(period) === -1) return false;
+          return entry.weeks.indexOf(week) !== -1;
+        });
+      }
+
       function isBusy(person, day, period, week){
+        // 手动安排优先于课表：用户明确说了这段没空，就不再按课表判断
+        if(specialHit(person, day, period, week)) return true;
         return person.courses.some(function(course){
           return course.day===day && period>=course.start && period<=course.end && course.weeks.indexOf(week)!==-1;
         });
@@ -1616,13 +1726,17 @@
           try {
             state.people = await window.pywebview.api.get_people();
             state.groups = await window.pywebview.api.get_groups();
+            var specials = await window.pywebview.api.get_specials();
+            state.specials = (specials && specials.specials) || [];
           } catch(e) {
             state.people = [];
             state.groups = [];
+            state.specials = [];
           }
         } else {
           state.people = FALLBACK_PEOPLE;
           state.groups = [{ name: '示例A组', parent: '' }, { name: '示例B组', parent: '' }];
+          state.specials = [];
         }
       }
 
@@ -2722,6 +2836,7 @@
       loadAppInfo();
       bindRailNav();
       bindAccounts();
+      bindSpecials();
       updateStatusbar();
       // 账号列表与教务系统地址都依赖 js_api 桥，必须等桥注入完成再拉，
       // 否则 isDesktop() 会是 false 而误用兜底数据（踩过）。
@@ -2736,18 +2851,255 @@
         populateGroupTarget();
         resetSelection();
         renderAll();
+        updateAddButton();
         refreshIfNeeded();
       });
 
       // 自动化自检用的钩子：本文件所有函数都在 IIFE 内，外部（含 WebView
       // 的 evaluate_js）访问不到，这里显式暴露几个只读入口，不影响正常功能。
+      /* =========================================================
+         手动添加的特殊安排（v3.1.2 新增）
+         课表 PDF 体现不了的情况：例会、值班、调课停课…
+         只做「占用」方向，统计时按没空处理。
+         ========================================================= */
+
+      var SP_MAX_WEEK = 18;
+      var specialDraft = null;
+
+      function updateAddButton(){
+        var btn = document.getElementById('add-special-btn');
+        if(!btn) return;
+        var count = state.specials.length;
+        btn.textContent = count ? '添加 · ' + count : '添加';
+        btn.title = count
+          ? '已添加 ' + count + ' 条，点此添加或删除'
+          : '添加课表体现不了的情况（例会、值班、调课停课）';
+      }
+
+      function openSpecialModal(){
+        specialDraft = { who: [], days: [], periods: [], weeks: [] };
+        document.getElementById('special-modal').hidden = false;
+        renderSpecialDraft();
+        renderSpecialList();
+      }
+
+      function closeSpecialModal(){
+        document.getElementById('special-modal').hidden = true;
+        specialDraft = null;
+      }
+
+      function renderSpecialDraft(){
+        if(!specialDraft) return;
+
+        // 人名来自已导入的课表
+        var people = state.people.filter(function(p){ return personKey(p); });
+        document.getElementById('sp-who').innerHTML = people.length
+          ? people.map(function(p){
+              var key = personKey(p);
+              var on = specialDraft.who.indexOf(key) !== -1;
+              return '<button class="sp-chip' + (on ? ' on' : '') + '" data-sp-who="' + esc(key) + '" type="button">' +
+                     esc(p.name || key) + '</button>';
+            }).join('')
+          : '<span class="sp-empty-inline">还没有导入课表</span>';
+
+        document.getElementById('sp-day').innerHTML = DAYS.map(function(name, index){
+          var day = index + 1;
+          var on = specialDraft.days.indexOf(day) !== -1;
+          return '<button class="sp-chip' + (on ? ' on' : '') + '" data-sp-day="' + day + '" type="button">' + name + '</button>';
+        }).join('');
+
+        var periods = '';
+        for(var p = 1; p <= 11; p++){
+          var pOn = specialDraft.periods.indexOf(p) !== -1;
+          periods += '<button class="sp-chip' + (pOn ? ' on' : '') + '" data-sp-period="' + p + '" type="button">第' + p + '节</button>';
+        }
+        document.getElementById('sp-period').innerHTML = periods;
+
+        var weeks = '<button class="sp-chip' + (specialDraft.weeks.length === SP_MAX_WEEK ? ' on' : '') +
+                    '" data-sp-weekall="1" type="button">全部周</button>';
+        for(var w = 1; w <= SP_MAX_WEEK; w++){
+          var wOn = specialDraft.weeks.indexOf(w) !== -1;
+          weeks += '<button class="sp-chip' + (wOn ? ' on' : '') + '" data-sp-week="' + w + '" type="button">' + w + '</button>';
+        }
+        document.getElementById('sp-week').innerHTML = weeks;
+
+        renderSpecialPreview();
+      }
+
+      function renderSpecialPreview(){
+        if(!specialDraft) return;
+        var who = specialDraft.who.length
+          ? specialDraft.who.map(function(key){
+              var hit = state.people.filter(function(p){ return personKey(p) === key; })[0];
+              return hit ? (hit.name || key) : key;
+            }).join('、')
+          : '（未选人）';
+        var dayText = specialDraft.days.length
+          ? specialDraft.days.map(function(d){ return DAYS[d-1]; }).join('、')
+          : '（未选星期）';
+        var periodText = specialDraft.periods.length
+          ? '第' + Math.min.apply(null, specialDraft.periods) + '–' + Math.max.apply(null, specialDraft.periods) + '节'
+          : '（未选节次）';
+        var weekText = !specialDraft.weeks.length
+          ? '（未选周次）'
+          : (specialDraft.weeks.length === SP_MAX_WEEK ? '全部周' : specialDraft.weeks.join('、') + ' 周');
+
+        document.getElementById('sp-preview').innerHTML =
+          '<b>' + esc(who) + '</b> · ' + esc(dayText) + ' · ' + esc(periodText) + ' · ' + esc(weekText);
+      }
+
+      function renderSpecialList(){
+        var box = document.getElementById('sp-list');
+        document.getElementById('sp-count').textContent = state.specials.length ? state.specials.length + ' 条' : '';
+
+        if(!state.specials.length){
+          box.innerHTML = '<div class="sp-empty">还没有添加。上面选好人名、星期、节次、周次后点「添加」，条目会出现在这里。</div>';
+          return;
+        }
+
+        box.innerHTML = state.specials.map(function(entry){
+          var names = entry.who.map(function(key){
+            var hit = state.people.filter(function(p){ return personKey(p) === key; })[0];
+            return hit ? (hit.name || key) : key;
+          }).join('、');
+          var days = entry.days.map(function(d){ return DAYS[d-1]; }).join('、');
+          var periods = '第' + Math.min.apply(null, entry.periods) + '–' + Math.max.apply(null, entry.periods) + '节';
+          var weeks = entry.weeks.length === SP_MAX_WEEK ? '全部周' : entry.weeks.join('、') + ' 周';
+
+          return '<div class="sp-item">' +
+            '<span class="sp-item-who">' + esc(names) + '</span>' +
+            '<span class="sp-item-when">' + esc(days + ' · ' + periods + ' · ' + weeks) + '</span>' +
+            '<button class="sp-item-del" data-sp-del="' + esc(entry.id) + '" type="button" title="删除">✕</button>' +
+          '</div>';
+        }).join('');
+      }
+
+      async function saveSpecial(){
+        if(!specialDraft) return;
+        var draft = specialDraft;
+
+        var missing = [];
+        if(!draft.who.length) missing.push('人名');
+        if(!draft.days.length) missing.push('星期');
+        if(!draft.periods.length) missing.push('节次');
+        if(!draft.weeks.length) missing.push('周次');
+        if(missing.length){
+          document.getElementById('sp-preview').innerHTML =
+            '<span style="color:#c42b1c">还差：' + missing.join('、') + '</span>';
+          return;
+        }
+
+        if(isDesktop()){
+          try {
+            var res = await window.pywebview.api.add_special(draft.who, draft.days, draft.periods, draft.weeks);
+            if(res && res.ok === false){ showToast('添加失败：' + (res.error || '未知错误')); return; }
+            state.specials = (res && res.specials) || state.specials;
+          } catch(e) {
+            showToast('添加失败：' + (e && e.message ? e.message : e));
+            return;
+          }
+        } else {
+          // 浏览器预览模式：只存内存，方便看效果
+          state.specials = state.specials.concat([{
+            id: 'local-' + Date.now(),
+            who: draft.who.slice(),
+            days: draft.days.slice(),
+            periods: draft.periods.slice(),
+            weeks: draft.weeks.slice()
+          }]);
+        }
+
+        // 不关闭弹窗：下面「已添加」要能立刻看到；但清空表单，避免重复点两次记两条
+        specialDraft = { who: [], days: [], periods: [], weeks: [] };
+        renderSpecialDraft();
+        renderSpecialList();
+        renderGrid();
+        updateAddButton();
+        showToast('已添加：' + draft.who.length + ' 人 · ' +
+          draft.days.map(function(d){ return DAYS[d-1]; }).join('、') + ' · 第' +
+          Math.min.apply(null, draft.periods) + '–' + Math.max.apply(null, draft.periods) + '节');
+      }
+
+      async function deleteSpecial(specialId){
+        if(isDesktop()){
+          try {
+            var res = await window.pywebview.api.remove_special(specialId);
+            state.specials = (res && res.specials) || [];
+          } catch(e) {
+            showToast('删除失败：' + (e && e.message ? e.message : e));
+            return;
+          }
+        } else {
+          state.specials = state.specials.filter(function(s){ return s.id !== specialId; });
+        }
+        renderSpecialList();
+        renderGrid();
+        updateAddButton();
+        showToast('已删除一条');
+      }
+
+      function toggleSpecialValue(list, value){
+        var index = list.indexOf(value);
+        if(index === -1) list.push(value); else list.splice(index, 1);
+      }
+
+      function bindSpecials(){
+        document.getElementById('add-special-btn').addEventListener('click', openSpecialModal);
+        document.getElementById('special-close').addEventListener('click', closeSpecialModal);
+        document.getElementById('special-cancel').addEventListener('click', closeSpecialModal);
+        document.getElementById('special-backdrop').addEventListener('click', closeSpecialModal);
+        document.getElementById('special-save').addEventListener('click', saveSpecial);
+
+        document.querySelector('#special-modal .win-modal-body').addEventListener('click', function(e){
+          var btn = e.target.closest ? e.target.closest('button') : null;
+          if(!btn) return;
+
+          // 删除不依赖 draft，先处理
+          if(btn.hasAttribute('data-sp-del')){
+            deleteSpecial(btn.getAttribute('data-sp-del'));
+            return;
+          }
+          if(!specialDraft) return;
+
+          if(btn.hasAttribute('data-sp-who')){
+            toggleSpecialValue(specialDraft.who, btn.getAttribute('data-sp-who'));
+          } else if(btn.hasAttribute('data-sp-day')){
+            toggleSpecialValue(specialDraft.days, parseInt(btn.getAttribute('data-sp-day'), 10));
+          } else if(btn.hasAttribute('data-sp-period')){
+            toggleSpecialValue(specialDraft.periods, parseInt(btn.getAttribute('data-sp-period'), 10));
+          } else if(btn.hasAttribute('data-sp-week')){
+            toggleSpecialValue(specialDraft.weeks, parseInt(btn.getAttribute('data-sp-week'), 10));
+          } else if(btn.hasAttribute('data-sp-weekall')){
+            if(specialDraft.weeks.length === SP_MAX_WEEK){
+              specialDraft.weeks = [];
+            } else {
+              var all = [];
+              for(var i = 1; i <= SP_MAX_WEEK; i++) all.push(i);
+              specialDraft.weeks = all;
+            }
+          } else {
+            return;
+          }
+          renderSpecialDraft();
+        });
+
+        document.addEventListener('keydown', function(e){
+          if(e.key === 'Escape' && specialDraft) closeSpecialModal();
+        });
+      }
+
       window.__synutv = {
         switchView: switchView,
         loadAccounts: loadAccounts,
         applyBrowserStatus: applyBrowserStatus,
         getView: currentView,
         state: state,
-        acctState: acctState
+        acctState: acctState,
+        // 手动添加特殊安排（自检用）
+        openSpecialModal: openSpecialModal,
+        closeSpecialModal: closeSpecialModal,
+        renderSpecialList: renderSpecialList,
+        updateAddButton: updateAddButton
       };
     })();
   </script>

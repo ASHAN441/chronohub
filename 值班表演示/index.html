@@ -388,6 +388,30 @@
 }
 .demo-bar b{ color:var(--win-accent); }
 .mark-new{ outline:2px solid var(--win-accent); outline-offset:1px; border-radius:5px; }
+
+/* 导出预览（模拟 Word 页面） */
+.export-overlay{ position:fixed; inset:0; z-index:70; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; }
+.export-overlay[hidden]{ display:none; }
+.export-box{ width:min(1000px,96vw); max-height:94vh; background:var(--win-bg); border-radius:10px;
+  display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,.35); }
+.export-head{ display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--win-surface);
+  border-bottom:1px solid var(--win-border); font-size:13px; }
+.export-head b{ font-size:13px; }
+.export-head .note{ font-size:11.5px; color:var(--win-text-muted); }
+.export-body{ flex:1; overflow:auto; padding:18px; }
+.paper{ background:#fff; color:#111; width:900px; margin:0 auto; padding:34px 40px 30px;
+  box-shadow:0 2px 12px rgba(0,0,0,.16); }
+.paper h1{ font-size:21px; font-weight:500; text-align:justify; margin:0 0 13px; letter-spacing:1px; }
+.paper table{ width:100%; border-collapse:collapse; table-layout:fixed; }
+.paper th, .paper td{ border:1px solid #333; padding:3px 5px; font-size:12px; text-align:center;
+  vertical-align:middle; word-break:break-all; line-height:1.35; }
+.paper th{ font-weight:600; }
+.paper tr.r-person td{ height:34px; font-size:12.5px; }
+.paper tr.r-meta td{ height:20px; font-size:11px; color:#444; }
+.paper tr.r-record td{ height:24px; }
+.paper tr.r-dual td{ height:44px; font-size:11.5px; line-height:1.5; }
+.paper .notes{ margin:11px 0 0; font-size:11.5px; line-height:1.95; color:#222; }
+.paper .notes div{ text-indent:-1.2em; padding-left:1.2em; }
 </style>
 </head>
 <body>
@@ -489,6 +513,7 @@
         </label>
         <button class="tb-btn primary" id="duty-generate" type="button">生成值班表</button>
         <button class="tb-btn" id="duty-again" type="button">重新随机</button>
+        <button class="tb-btn primary" id="duty-export" type="button">导出值班表</button>
         <span class="tb-spacer"></span>
         <span class="tb-info" id="duty-hint">点任意格子可换人</span>
       </div>
@@ -518,6 +543,22 @@
 <div class="win-statusbar">
   <span>第 1 周 · 已选 40 人</span>
   <span style="margin-left:auto">排值班表：周一~周五 · 第1-8节</span>
+</div>
+
+<!-- 导出预览：按 值班表.docx 的版式填充 -->
+<div class="export-overlay" id="export-overlay" hidden>
+  <div class="export-box">
+    <div class="export-head">
+      <b>导出预览</b>
+      <span class="note">按「值班表.docx」模板填充 · 联系方式为示意数据</span>
+      <span style="margin-left:auto"></span>
+      <button class="tb-btn" id="export-close" type="button">关闭</button>
+      <button class="tb-btn primary" id="export-word" type="button">导出 Word</button>
+    </div>
+    <div class="export-body">
+      <div class="paper" id="export-paper"></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -785,6 +826,95 @@
   }
 
   /* ---------- 事件 ---------- */
+  /* ---------- 导出：按「值班表.docx」的版式填充 ---------- */
+  var demoTimer = null;
+  function showDemoToast(msg){
+    var el = document.getElementById('demo-toast');
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'demo-toast';
+      el.className = 'win-toast';
+      el.style.position = 'fixed';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.hidden = false;
+    clearTimeout(demoTimer);
+    demoTimer = setTimeout(function(){ el.hidden = true; }, 2600);
+  }
+
+  function phoneOf(person){
+    var idx = state.pool.indexOf(person);
+    if(idx < 0) idx = 0;
+    return '138 0013 ' + String(2400 + idx);
+  }
+
+  function renderExport(){
+    var rows = '';
+
+    var head = '<tr><th style="width:16%">星期时间</th>';
+    for(var d=0; d<5; d++) head += '<th>' + DAYS[d] + '</th>';
+    rows += head + '</tr>';
+
+    // 第1-8节：自动排班结果
+    DUTY_BLOCKS.forEach(function(b, bi){
+      var line = '<tr class="r-person"><th>第' + b[0] + '、' + b[1] + '节</th>';
+      for(var d=1; d<=5; d++){
+        var s = state.slots[d + '-' + bi];
+        line += '<td>' + ((s && s.person) ? s.person.name : '') + '</td>';
+      }
+      rows += line + '</tr>';
+
+      var contact = '<tr class="r-meta"><th>联系方式</th>';
+      for(var d2=1; d2<=5; d2++){
+        var s2 = state.slots[d2 + '-' + bi];
+        contact += '<td>' + ((s2 && s2.person) ? phoneOf(s2.person) : '') + '</td>';
+      }
+      rows += contact + '</tr>';
+
+      rows += '<tr class="r-record"><th>值班记录</th><td></td><td></td><td></td><td></td><td></td></tr>';
+    });
+
+    // 第9、10节：模板里是「台务 / 部长」双人岗
+    var hall = PEOPLE.filter(function(p){ return p.group === '台务'; })[0];
+    var ministers = PEOPLE.filter(function(p){ return p.group === '部长'; }).slice(-5);
+
+    var dual = '<tr class="r-dual"><th>第9、10节<br>(台务/部长)</th>';
+    for(var d3=1; d3<=5; d3++){
+      var mp = ministers[d3-1];
+      dual += '<td>台务：' + (hall ? hall.name : '') + '<br>部长：' + (mp ? mp.name : '') + '</td>';
+    }
+    rows += dual + '</tr>';
+
+    var dualContact = '<tr class="r-meta"><th>联系方式</th>';
+    for(var d4=1; d4<=5; d4++){
+      var mp2 = ministers[d4-1];
+      dualContact += '<td>' + (hall ? phoneOf(hall) : '') + '<br>' + (mp2 ? phoneOf(mp2) : '') + '</td>';
+    }
+    rows += dualContact + '</tr>';
+    rows += '<tr class="r-record"><th>值班记录</th><td></td><td></td><td></td><td></td><td></td></tr>';
+
+    document.getElementById('export-paper').innerHTML =
+      '<h1>第十五届第（' + state.week + '）周信息楼108值班记录</h1>' +
+      '<table>' + rows + '</table>' +
+      '<div class="notes">' +
+        '<div>注：1. 请值班同学在指定位置签到，并记录值班期间台内情况。</div>' +
+        '<div>2. 请值班同学在收到值班提醒后及时回复收到，并按时到达信息楼108进行值班任务。</div>' +
+        '<div>3. 值班过程中要保持台内卫生干净整洁，一个舒适的工作环境有利于工作效率的提高。</div>' +
+        '<div>4. 听从老师和台务的工作安排，完成布置的任务。</div>' +
+        '<div>5. 台务、部长级值班当天除九、十节必须在台里值班之外，剩余空课时间也来台里值班。</div>' +
+      '</div>';
+  }
+
+  function openExport(){
+    renderExport();
+    document.getElementById('export-overlay').hidden = false;
+  }
+
+  function closeExport(){
+    document.getElementById('export-overlay').hidden = true;
+  }
+
   function switchView(name){
     ['freetime','duty'].forEach(function(key){
       var view = document.getElementById('view-' + key);
@@ -811,6 +941,18 @@
     document.getElementById('duty-generate').addEventListener('click', generate);
     document.getElementById('duty-again').addEventListener('click', generate);
 
+    document.getElementById('duty-export').addEventListener('click', function(){
+      if(!Object.keys(state.slots).length) generate();
+      openExport();
+    });
+    document.getElementById('export-close').addEventListener('click', closeExport);
+    document.getElementById('export-overlay').addEventListener('click', function(e){
+      if(e.target === this) closeExport();
+    });
+    document.getElementById('export-word').addEventListener('click', function(){
+      showDemoToast('演示里只做预览；接进真实应用后点这里会生成填好的 .docx');
+    });
+
     document.getElementById('duty-body').addEventListener('click', function(e){
       var td = e.target.closest ? e.target.closest('td[data-day]') : null;
       if(td) openPicker(td);
@@ -823,7 +965,7 @@
     });
 
     document.addEventListener('keydown', function(e){
-      if(e.key === 'Escape') closePicker();
+      if(e.key === 'Escape'){ closePicker(); closeExport(); }
     });
   }
 

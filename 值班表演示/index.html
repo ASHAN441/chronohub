@@ -344,9 +344,13 @@
 .duty-summary .warn b{ color:#c42b1c; }
 
 .duty-counts{ border-top:1px solid var(--win-border); padding-top:11px; }
-.duty-counts-head{ display:flex; align-items:baseline; gap:8px; font-size:12.5px; margin-bottom:7px; }
+.duty-counts-head{ display:flex; align-items:center; gap:8px; font-size:12.5px; margin-bottom:8px; }
 .duty-counts-head span{ font-size:11.5px; color:var(--win-text-muted); }
-.duty-chips{ display:flex; flex-wrap:wrap; gap:5px; max-height:150px; overflow-y:auto; }
+.duty-search{ width:170px; height:26px; font-size:12px; }
+.duty-groups{ display:flex; flex-direction:column; gap:10px; max-height:215px; overflow-y:auto; }
+.duty-group-title{ font-size:11.5px; color:var(--win-text-muted); margin-bottom:5px; }
+.duty-chip-row{ display:flex; flex-wrap:wrap; gap:5px; }
+.duty-empty{ font-size:12px; color:var(--win-text-muted); padding:12px; text-align:center; }
 .duty-chip{
   display:inline-flex; align-items:center; gap:5px; font-size:12px;
   border:1px solid var(--win-border); background:var(--win-surface); color:var(--win-text);
@@ -519,8 +523,11 @@
           <div class="duty-counts-head">
             <b>累计值班次数</b>
             <span id="duty-count-hint"></span>
+            <span style="margin-left:auto"></span>
+            <input class="win-input duty-search" id="duty-count-search" type="search"
+                   placeholder="搜索姓名" autocomplete="off">
           </div>
-          <div class="duty-chips" id="duty-chips"></div>
+          <div class="duty-groups" id="duty-chips"></div>
         </div>
       </div>
     </section>
@@ -775,22 +782,48 @@
   function renderCounts(){
     document.getElementById('duty-count-hint').textContent = '（含历史累计；高亮为本周值班）';
 
-    var all = [], seen = {};
-    state.members.concat(state.ministers, state.halls).forEach(function(p){
-      if(seen[key(p)]) return;
-      seen[key(p)] = true;
-      all.push(p);
-    });
-    all.sort(function(a,b){
-      return (state.totals[key(b)] - state.totals[key(a)]) || a.name.localeCompare(b.name);
+    var box = document.getElementById('duty-chips');
+    if(!state.members.length && !state.ministers.length){
+      box.innerHTML = '<div class="duty-empty">生成值班表后，这里显示各分组的累计次数</div>';
+      return;
+    }
+
+    var keyword = (document.getElementById('duty-count-search').value || '').trim().toLowerCase();
+    var safeKeyword = keyword.replace(/[&<>"]/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c];
     });
 
-    document.getElementById('duty-chips').innerHTML = all.map(function(p){
-      var on = !!state.used[key(p)];
-      return '<span class="duty-chip' + (on ? ' on' : ' muted') + '">' +
-        p.name + '<span class="grp">' + p.group + '</span>' +
-        '<span class="cnt">' + state.totals[key(p)] + ' 次</span></span>';
-    }).join('');
+    // 按分组分开显示：部员 / 部长 / 台务
+    var sections = [
+      { name:'部员', pool: state.members },
+      { name:'部长', pool: state.ministers },
+      { name:'台务', pool: state.halls }
+    ];
+
+    var html = '';
+    sections.forEach(function(sec){
+      var list = sec.pool.filter(function(p){
+        if(!keyword) return true;
+        return String(p.name || '').toLowerCase().indexOf(keyword) !== -1;
+      }).sort(function(a,b){
+        return (state.totals[key(b)] - state.totals[key(a)]) || a.name.localeCompare(b.name);
+      });
+
+      if(!list.length) return;   // 搜不到就整组隐藏，免得一屏空标题
+
+      html += '<div class="duty-group-block">' +
+        '<div class="duty-group-title">' + sec.name + ' · ' + list.length + ' 人</div>' +
+        '<div class="duty-chip-row">' +
+          list.map(function(p){
+            var on = !!state.used[key(p)];
+            return '<span class="duty-chip' + (on ? ' on' : ' muted') + '">' +
+              p.name + '<span class="cnt">' + state.totals[key(p)] + ' 次</span></span>';
+          }).join('') +
+        '</div></div>';
+    });
+
+    box.innerHTML = html ||
+      '<div class="duty-empty">没有匹配「' + safeKeyword + '」的人</div>';
   }
 
   /* ---------- 换人 ---------- */
@@ -996,6 +1029,9 @@
 
     document.getElementById('duty-generate').addEventListener('click', generate);
     document.getElementById('duty-again').addEventListener('click', generate);
+
+    // 累计次数搜索：输入即过滤，只重绘次数区
+    document.getElementById('duty-count-search').addEventListener('input', renderCounts);
 
     document.getElementById('duty-export').addEventListener('click', function(){
       if(!Object.keys(state.slots).length) generate();

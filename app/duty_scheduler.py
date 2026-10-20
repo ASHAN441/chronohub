@@ -30,7 +30,7 @@ DUAL_BLOCK = (9, 10)
 DUTY_DAYS = range(1, 6)  # 周一到周五
 
 
-def _busy(person: dict, specials: list, key: str, day: int, start: int, end: int, week: int) -> bool:
+def is_busy(person: dict, specials: list, key: str, day: int, start: int, end: int, week: int) -> bool:
     """该人在该时段是否没空（课表命中或手动安排命中）。"""
     for course in person.get("courses") or []:
         if course.get("day") != day:
@@ -105,7 +105,7 @@ def generate_roster(person_dicts, specials, week, groups, totals, rng=None):
             key = person_key(person)
             if key in used:
                 continue
-            if _busy(person, specials, key, day, start, end, week):
+            if is_busy(person, specials, key, day, start, end, week):
                 continue
             result.append(person)
         return result
@@ -171,7 +171,7 @@ def swap_candidates(person_dicts, specials, week, groups, role, day, start, end,
             continue
         if (person.get("group") or "") != name:
             continue
-        if _busy(person, specials, key, day, start, end, week):
+        if is_busy(person, specials, key, day, start, end, week):
             continue
         out.append(key)
     return sorted(out)

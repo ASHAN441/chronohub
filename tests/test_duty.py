@@ -291,6 +291,47 @@ class ApiDutyTest(unittest.TestCase):
         result = self.api.swap_duty(9, 1, 0, "member", "M0")
         self.assertFalse(result["ok"])
 
+    def test_swap_rejects_busy_person(self):
+        """换人接口必须自己校验可用性——前端只给合法候选，但接口不能不设防。"""
+        self.api.generate_duty(1, GROUPS)
+        roster = self.api.get_duty()["rosters"][0]
+        slot = [a for a in roster["assignments"] if a["kind"] == "member"][0]
+
+        from app.models import Course
+
+        used = {a.get("person") for a in roster["assignments"] if a.get("person")}
+        spare = [p for p in self.api.people
+                 if p.group == "部员" and p.student_id not in used][0]
+        spare.courses = [Course(name="全覆盖的课", day=slot["day"], start=1, end=11,
+                                weeks=list(range(1, 19)))]
+
+        result = self.api.swap_duty(1, slot["day"], slot["block"], "member", spare.student_id)
+        self.assertFalse(result["ok"])
+        self.assertIn("没空", result["error"])
+
+    def test_swap_rejects_double_booking(self):
+        """每周最多 1 次的限制，换人时也必须守住。"""
+        self.api.generate_duty(1, GROUPS)
+        roster = self.api.get_duty()["rosters"][0]
+        slots = [a for a in roster["assignments"]
+                 if a["kind"] == "member" and a.get("person")]
+        self.assertGreaterEqual(len(slots), 2)
+        target, other = slots[0], slots[1]
+
+        result = self.api.swap_duty(1, target["day"], target["block"], "member", other["person"])
+        self.assertFalse(result["ok"])
+        self.assertIn("每周最多", result["error"])
+
+    def test_swap_rejects_wrong_role(self):
+        """双岗只能换部长/台务，单岗只能换部员。"""
+        self.api.generate_duty(1, GROUPS)
+        roster = self.api.get_duty()["rosters"][0]
+        dual = [a for a in roster["assignments"] if a["kind"] == "dual"][0]
+
+        result = self.api.swap_duty(1, dual["day"], dual["block"], "member", "M0")
+        self.assertFalse(result["ok"])
+        self.assertIn("只能换", result["error"])
+
     def test_clear_week(self):
         self.api.generate_duty(1, GROUPS)
         result = self.api.clear_duty(1)
@@ -307,6 +348,119 @@ class ApiDutyTest(unittest.TestCase):
         second = self.api.get_duty()["counts"]
         self.assertTrue(all(v == 1 for v in second.values()),
                         "覆盖同一周后，次数仍应是每人 1 次")
+
+
+class AdjustTest(unittest.TestCase):
+    """手动修改值班次数：必须留记录、能撤销，且不能被排班动作冲掉。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.api = Api(
+            data_path=os.path.join(self._tmp.name, "people.json"),
+            groups_path=os.path.join(self._tmp.name, "groups.json"),
+            accounts_db_path=os.path.join(self._tmp.name, "accounts.db"),
+        )
+        from app.models import Person
+
+        self.api.people = []
+        for i in range(25):
+            self.api.people.append(Person(name=f"部员{i}", student_id=f"M{i}", group="部员"))
+        for i in range(6):
+            self.api.people.append(Person(name=f"部长{i}", student_id=f"N{i}", group="部长"))
+        for i in range(5):
+            self.api.people.append(Person(name=f"台务{i}", student_id=f"H{i}", group="台务"))
+        self.api.generate_duty(1, GROUPS)
+
+    def tearDown(self):
+        self.api.accounts.close()
+        self._tmp.cleanup()
+
+    def _some_member(self) -> str:
+        roster = self.api.get_duty()["rosters"][0]
+        return [a["person"] for a in roster["assignments"]
+                if a["kind"] == "member" and a.get("person")][0]
+
+    def test_adjust_path_isolated(self):
+        self.assertEqual(
+            self.api.adjust_path,
+            os.path.join(self._tmp.name, "duty_adjust.json"),
+            "手动调整要跟数据放一起，测试不能污染真实数据",
+        )
+
+    def test_adjust_adds_to_total(self):
+        key = self._some_member()
+        before = self.api.get_duty()
+        base = before["counts"][key]
+
+        result = self.api.adjust_duty(key, 2, "补记上学期")
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["counts"][key], base + 2)
+        self.assertEqual(result["roster_counts"][key], base, "排班统计不该被改")
+        self.assertEqual(result["manual_counts"][key], 2)
+        self.assertEqual(len(result["adjustments"]), 1)
+        self.assertEqual(result["adjustments"][0]["note"], "补记上学期")
+
+    def test_adjust_negative(self):
+        key = self._some_member()
+        base = self.api.get_duty()["counts"][key]
+        result = self.api.adjust_duty(key, -1)
+        self.assertEqual(result["counts"][key], base - 1)
+
+    def test_adjust_persists_across_instances(self):
+        key = self._some_member()
+        self.api.adjust_duty(key, 3)
+
+        fresh = Api(
+            data_path=self.api.data_path,
+            groups_path=self.api.groups_path,
+            accounts_db_path=os.path.join(self._tmp.name, "a2.db"),
+        )
+        try:
+            payload = fresh.get_duty()
+            self.assertEqual(payload["manual_counts"].get(key), 3)
+        finally:
+            fresh.accounts.close()
+
+    def test_adjust_survives_regenerate(self):
+        """重新排班（甚至换人）不能把手动记录冲掉。"""
+        key = self._some_member()
+        self.api.adjust_duty(key, 2, "补记")
+
+        self.api.generate_duty(1, GROUPS)
+        payload = self.api.get_duty()
+        self.assertEqual(payload["manual_counts"].get(key), 2, "手动记录必须保留")
+        self.assertEqual(len(payload["adjustments"]), 1)
+
+    def test_adjust_does_not_touch_rosters(self):
+        key = self._some_member()
+        before = json.dumps(self.api.get_duty()["rosters"], sort_keys=True)
+        self.api.adjust_duty(key, 1)
+        after = json.dumps(self.api.get_duty()["rosters"], sort_keys=True)
+        self.assertEqual(before, after, "调次数不该改动排班本身")
+
+    def test_undo_adjustment(self):
+        key = self._some_member()
+        base = self.api.get_duty()["counts"][key]
+        added = self.api.adjust_duty(key, 2)
+        adjust_id = added["adjustments"][0]["id"]
+
+        result = self.api.undo_adjustment(adjust_id)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["counts"][key], base)
+        self.assertEqual(result["adjustments"], [])
+
+    def test_undo_unknown_id_fails(self):
+        result = self.api.undo_adjustment("nope")
+        self.assertFalse(result["ok"])
+
+    def test_rejects_invalid_adjustments(self):
+        key = self._some_member()
+        self.assertFalse(self.api.adjust_duty(key, 0)["ok"])
+        self.assertFalse(self.api.adjust_duty(key, "x")["ok"])
+        self.assertFalse(self.api.adjust_duty(key, 500)["ok"])
+        self.assertFalse(self.api.adjust_duty("不存在的人", 1)["ok"])
+        self.assertFalse(self.api.adjust_duty("", 1)["ok"])
+        self.assertEqual(self.api.get_duty()["adjustments"], [])
 
 
 class ExportTest(unittest.TestCase):
@@ -363,6 +517,44 @@ class ExportTest(unittest.TestCase):
 
         # 注意事项要原样保留
         self.assertIn("信息楼108", titles[0])
+
+    def test_export_font_matches_template(self):
+        """空格子填入的人名必须继承模板的字体，不能掉到文档默认字体。
+
+        实测踩过：模板表格是黑体 12pt，空格子没有 run，直接 add_run
+        出来是 Arial 默认字体，打出来和整张表不协调。
+        """
+        if not os.path.exists(TEMPLATE):
+            self.skipTest("缺少值班表.docx 模板")
+
+        self.api.generate_duty(3, GROUPS)
+        out = os.path.join(self._tmp.name, "font.docx")
+        result = self.api.export_duty(3, out)
+        self.assertTrue(result["ok"], result.get("error"))
+
+        from docx import Document
+        from docx.oxml.ns import qn
+
+        document = Document(out)
+        table = document.tables[0]
+
+        # 找一个填了人名的单岗格子
+        filled = None
+        for row in table.rows[1:]:
+            for cell in row.cells[1:]:
+                text = (cell.text or "").strip()
+                if text and "台务" not in text:
+                    filled = cell
+                    break
+            if filled:
+                break
+        self.assertIsNotNone(filled, "应至少有一个填了人名的格子")
+
+        run = filled.paragraphs[0].runs[0]
+        self.assertIsNotNone(run.font.element.rPr, "填入的文字应有格式属性")
+        east_asia = run.font.element.rPr.rFonts.get(qn("w:eastAsia"))
+        self.assertEqual(east_asia, "黑体", "中文字体应继承模板的黑体")
+        self.assertEqual(run.font.size.pt, 12.0, "字号应继承模板的 12pt")
 
     def test_export_missing_week(self):
         result = self.api.export_duty(7, os.path.join(self._tmp.name, "x.docx"))

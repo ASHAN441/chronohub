@@ -163,3 +163,84 @@ def count_assignments(rosters: list, exclude_week: int = None) -> dict:
                 if key:
                     counts[key] = counts.get(key, 0) + 1
     return counts
+
+
+# ================= 手动调整值班次数 =================
+#
+# 为什么要单独存一个文件：自动排班和手动修正是两个生命周期。
+# 混在 duty.json 里，重新生成某一周或换人时容易被覆盖掉；
+# 分开存就永远不会被排班动作碰到。
+#
+# 存成「流水」而不是「最终数字」：每次 +1/-1 都留一条记录（谁、多少、什么时候、
+# 为什么），既能追溯，也能单条撤销。最终次数 = 排班统计 + 流水合计。
+
+ADJUST_FILE = os.path.join(data_dir(), "duty_adjust.json")
+
+
+def _clean_adjustment(item) -> dict | None:
+    if not isinstance(item, dict):
+        return None
+    person = str(item.get("person") or "").strip()
+    if not person:
+        return None
+    try:
+        delta = int(item.get("delta"))
+    except (TypeError, ValueError):
+        return None
+    if delta == 0 or not (-99 <= delta <= 99):
+        return None
+    return {
+        "id": str(item.get("id") or uuid.uuid4().hex[:10]),
+        "person": person,
+        "delta": delta,
+        "note": str(item.get("note") or "").strip()[:60],
+        "at": str(item.get("at") or datetime.now().isoformat(timespec="seconds")),
+    }
+
+
+def load_adjustments(path: str = None) -> list:
+    """读取手动调整流水。文件损坏返回空列表。"""
+    target = path or ADJUST_FILE
+    if not os.path.exists(target):
+        return []
+    try:
+        with open(target, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError, TypeError):
+        return []
+
+    items = data.get("adjustments") if isinstance(data, dict) else data
+    if not isinstance(items, list):
+        return []
+
+    result = []
+    for item in items:
+        cleaned = _clean_adjustment(item)
+        if cleaned is not None:
+            result.append(cleaned)
+    return result
+
+
+def save_adjustments(items: list, path: str = None) -> None:
+    target = path or ADJUST_FILE
+    directory = os.path.dirname(target)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    payload = {"adjustments": [a for a in (_clean_adjustment(x) for x in items) if a]}
+    with open(target, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=2)
+
+
+def sum_adjustments(items: list) -> dict:
+    """每人手动调整的净次数。"""
+    totals = {}
+    for item in items or []:
+        person = str(item.get("person") or "").strip()
+        if not person:
+            continue
+        try:
+            delta = int(item.get("delta") or 0)
+        except (TypeError, ValueError):
+            continue
+        totals[person] = totals.get(person, 0) + delta
+    return totals

@@ -361,6 +361,29 @@
     .duty-picker-item:hover{ background:var(--win-surface-3); }
     .duty-picker-item .c{ font-size:11px; color:var(--win-text-muted); }
     .duty-picker-empty{ font-size:12px; color:var(--win-text-muted); padding:8px; text-align:center; line-height:1.7; }
+    /* 手动调整次数的小面板 */
+    .duty-adjust{ position:fixed; z-index:65; width:264px; background:var(--win-surface);
+      border:1px solid var(--win-border); border-radius:7px; box-shadow:0 10px 28px rgba(0,0,0,.24);
+      padding:10px; }
+    .duty-adjust-title{ font-size:12.5px; font-weight:600; margin-bottom:5px; }
+    .duty-adjust-meta{ font-size:11.5px; color:var(--win-text-muted); line-height:1.7; }
+    .duty-adjust-row{ display:flex; gap:6px; align-items:center; margin:8px 0; }
+    .duty-adjust-btn{ width:36px; height:26px; flex:none; border:1px solid var(--win-border);
+      background:var(--win-surface); color:var(--win-text); border-radius:5px; cursor:pointer;
+      font-size:13px; font-family:inherit; }
+    .duty-adjust-btn:hover{ background:var(--win-surface-3); }
+    .duty-adjust-note{ flex:1; height:26px; font-size:12px; }
+    .duty-adjust-list{ max-height:118px; overflow-y:auto; display:flex; flex-direction:column; gap:4px;
+      margin-top:6px; }
+    .duty-adjust-item{ display:flex; align-items:center; gap:6px; font-size:11.5px;
+      color:var(--win-text-muted); }
+    .duty-adjust-item .d{ color:var(--win-accent); font-weight:600; flex:none; min-width:22px; }
+    .duty-adjust-item .t{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .duty-adjust-undo{ flex:none; width:18px; height:18px; border:1px solid var(--win-border);
+      background:var(--win-surface); color:var(--win-text-muted); border-radius:4px; cursor:pointer;
+      font-size:10px; line-height:1; padding:0; }
+    .duty-adjust-undo:hover{ color:#c42b1c; }
+    .duty-chip[data-key]{ cursor:pointer; }
   </style>
 </head>
 <body>
@@ -3450,7 +3473,7 @@
             '<div class="duty-chip-row">' +
               keys.map(function(key){
                 var on = !!used[key];
-                return '<span class="duty-chip' + (on ? ' on' : ' muted') + '">' +
+                return '<span class="duty-chip' + (on ? ' on' : ' muted') + '" data-key="' + esc(key) + '">' +
                   esc(data.names[key]) + '<span class="cnt">' + dutyCountOf(key) + ' 次</span></span>';
               }).join('') +
             '</div></div>';
@@ -3460,6 +3483,108 @@
           '<div style="color:var(--win-text-muted);text-align:center;padding:14px;font-size:12px">没有匹配「' +
           safeKeyword + '」的人</div>';
         document.getElementById('duty-count-hint').textContent = '（含历史累计；高亮为本周值班）';
+      }
+
+      /* ---------- 手动调整值班次数 ---------- */
+      function closeAdjustBox(){
+        var el = document.querySelector('.duty-adjust');
+        if(el) el.remove();
+      }
+
+      function findDutyChip(key){
+        var chips = document.querySelectorAll('#duty-groups .duty-chip');
+        for(var i = 0; i < chips.length; i++){
+          if(chips[i].getAttribute('data-key') === key) return chips[i];
+        }
+        return null;
+      }
+
+      function openAdjustBox(chip){
+        closeAdjustBox();
+        var key = chip.getAttribute('data-key');
+        if(!key) return;
+
+        var data = dutyState.data || {};
+        var name = (data.names || {})[key] || key;
+        var rosterN = (data.roster_counts || {})[key] || 0;
+        var manualN = (data.manual_counts || {})[key] || 0;
+        var records = (data.adjustments || []).filter(function(a){ return a.person === key; });
+
+        var box = document.createElement('div');
+        box.className = 'duty-adjust';
+        box.innerHTML =
+          '<div class="duty-adjust-title">' + esc(name) + ' · 累计 ' + (rosterN + manualN) + ' 次</div>' +
+          '<div class="duty-adjust-meta">排班 ' + rosterN + ' 次' +
+            (manualN ? '，手动 ' + (manualN > 0 ? '+' : '') + manualN + ' 次' : '') +
+          '</div>' +
+          '<div class="duty-adjust-row">' +
+            '<button class="duty-adjust-btn" data-delta="1" type="button" title="加一次">+1</button>' +
+            '<button class="duty-adjust-btn" data-delta="-1" type="button" title="减一次">-1</button>' +
+            '<input class="win-input duty-adjust-note" placeholder="备注（可选）" maxlength="60">' +
+          '</div>' +
+          (records.length
+            ? '<div class="duty-adjust-meta">手动记录</div><div class="duty-adjust-list">' +
+                records.map(function(a){
+                  return '<div class="duty-adjust-item">' +
+                    '<span class="d">' + (a.delta > 0 ? '+' : '') + a.delta + '</span>' +
+                    '<span class="t" title="' + esc(a.note || '') + '">' +
+                      esc(String(a.at || '').replace('T', ' ').slice(5, 16)) +
+                      (a.note ? ' · ' + esc(a.note) : '') + '</span>' +
+                    '<button class="duty-adjust-undo" data-undo="' + esc(a.id) +
+                      '" type="button" title="撤销这条">✕</button>' +
+                  '</div>';
+                }).join('') +
+              '</div>'
+            : '');
+
+        var rect = chip.getBoundingClientRect();
+        box.style.left = Math.min(rect.left, window.innerWidth - 280) + 'px';
+        box.style.top = Math.min(rect.bottom + 4, window.innerHeight - 250) + 'px';
+        document.body.appendChild(box);
+
+        box.addEventListener('click', function(e){
+          var btn = e.target.closest ? e.target.closest('button') : null;
+          if(!btn) return;
+          if(btn.hasAttribute('data-delta')){
+            var input = box.querySelector('.duty-adjust-note');
+            applyDutyAdjust(key, parseInt(btn.getAttribute('data-delta'), 10),
+                            input ? input.value : '');
+          } else if(btn.hasAttribute('data-undo')){
+            undoDutyAdjust(btn.getAttribute('data-undo'));
+          }
+        });
+      }
+
+      async function applyDutyAdjust(key, delta, note){
+        if(!isDesktop()){ showToast('浏览器预览模式无法调整次数'); return; }
+        try {
+          var res = await window.pywebview.api.adjust_duty(key, delta, note || '');
+          if(!res || res.ok === false){
+            showToast('调整失败：' + ((res && res.error) || '未知错误'));
+            return;
+          }
+          dutyState.data = res;
+          renderDuty();
+          var chip = findDutyChip(key);
+          if(chip) openAdjustBox(chip);
+        } catch(e) {
+          showToast('调整失败：' + (e && e.message ? e.message : e));
+        }
+      }
+
+      async function undoDutyAdjust(adjustId){
+        try {
+          var res = await window.pywebview.api.undo_adjustment(adjustId);
+          if(!res || res.ok === false){
+            showToast('撤销失败：' + ((res && res.error) || '未知错误'));
+            return;
+          }
+          dutyState.data = res;
+          renderDuty();
+          closeAdjustBox();
+        } catch(e) {
+          showToast('撤销失败：' + (e && e.message ? e.message : e));
+        }
       }
 
       /* ---------- 换人 ---------- */
@@ -3663,6 +3788,12 @@
         });
         document.getElementById('duty-search').addEventListener('input', renderDutyCounts);
 
+        // 点人名 chip → 手动调整值班次数
+        document.getElementById('duty-groups').addEventListener('click', function(e){
+          var chip = e.target.closest ? e.target.closest('.duty-chip') : null;
+          if(chip) openAdjustBox(chip);
+        });
+
         document.getElementById('duty-body').addEventListener('click', function(e){
           var td = e.target.closest ? e.target.closest('td[data-day]') : null;
           if(td) openDutyPicker(td);
@@ -3670,14 +3801,19 @@
 
         document.addEventListener('click', function(e){
           var box = document.querySelector('.duty-picker');
-          if(!box) return;
-          if(!box.contains(e.target) && !(e.target.closest && e.target.closest('td[data-day]'))) {
+          if(box && !box.contains(e.target) &&
+             !(e.target.closest && e.target.closest('td[data-day]'))) {
             closeDutyPicker();
+          }
+          var adj = document.querySelector('.duty-adjust');
+          if(adj && !adj.contains(e.target) &&
+             !(e.target.closest && e.target.closest('.duty-chip'))) {
+            closeAdjustBox();
           }
         });
 
         document.addEventListener('keydown', function(e){
-          if(e.key === 'Escape') closeDutyPicker();
+          if(e.key === 'Escape'){ closeDutyPicker(); closeAdjustBox(); }
         });
       }
 

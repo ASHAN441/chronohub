@@ -11,14 +11,19 @@ from .account_service import AccountService
 from .clipboard import set_text_temporary
 from .config import app_info
 from .docx_export import export_roster, template_path
-from .duty_scheduler import generate_roster, swap_candidates
+from .duty_scheduler import generate_roster, is_busy, swap_candidates
 from .duty_store import (
+    ADJUST_FILE,
     DUTY_FILE,
+    _clean_adjustment as clean_adjustment,
     count_assignments,
+    load_adjustments,
     load_rosters,
     normalize_roster,
     person_key as duty_person_key,
+    save_adjustments,
     save_rosters,
+    sum_adjustments,
     upsert_roster,
 )
 from .parser import PARSER_VERSION, parse_pdf
@@ -63,6 +68,7 @@ class Api:
         accounts_db_path: str = None,
         specials_path: str = None,
         duty_path: str = None,
+        adjust_path: str = None,
     ):
         self._window = None
         self._qt_app = None
@@ -90,6 +96,16 @@ class Api:
         else:
             self.duty_path = DUTY_FILE
 
+        # 手动调整值班次数：单独一个文件，不会被排班动作覆盖
+        if adjust_path:
+            self.adjust_path = adjust_path
+        elif data_path:
+            self.adjust_path = os.path.join(
+                os.path.dirname(os.path.abspath(data_path)), "duty_adjust.json"
+            )
+        else:
+            self.adjust_path = ADJUST_FILE
+
         # 导出的兜底目录：跟数据放一起，注入 data_path 时自动隔离
         if data_path:
             self.exports_dir = os.path.join(
@@ -102,6 +118,7 @@ class Api:
         self.groups = load_groups(self.groups_path)
         self.specials = load_specials(self.specials_path)
         self.rosters = load_rosters(self.duty_path)
+        self.adjustments = load_adjustments(self.adjust_path)
         self._lock = threading.Lock()
         # 人员数据的读写锁。为什么必须有：批量导入跑在后台线程，而
         # 「导出课表 → 自动入库」走 js_api 子线程，两者可能同时 _merge 并写同一个
@@ -518,6 +535,7 @@ class Api:
     def get_duty(self) -> dict:
         with self._people_lock:
             rosters = [json.loads(json.dumps(r)) for r in self.rosters]
+            adjustments = [dict(item) for item in self.adjustments]
             people = [p.to_dict() for p in self.people]
 
         names = {}
@@ -528,14 +546,69 @@ class Api:
                 names[key] = person.get("name") or key
                 group_of[key] = person.get("group") or ""
 
+        roster_counts = count_assignments(rosters)
+        manual_counts = sum_adjustments(adjustments)
+
+        # 合计 = 排班统计 + 手动调整，前端只认 counts
+        counts = dict(roster_counts)
+        for key, delta in manual_counts.items():
+            counts[key] = counts.get(key, 0) + delta
+
         return {
             "rosters": rosters,
-            "counts": count_assignments(rosters),
+            "counts": counts,
+            "roster_counts": roster_counts,
+            "manual_counts": manual_counts,
+            "adjustments": adjustments,
             "names": names,
             "groups": group_of,
             "group_names": sorted({g for g in group_of.values() if g}),
             "has_template": bool(template_path()),
         }
+
+    def adjust_duty(self, person_key, delta, note="") -> dict:
+        """手动修改某人的累计值班次数（记一条流水，不碰排班）。"""
+        person_key = str(person_key or "").strip()
+        if not person_key:
+            return {"ok": False, "error": "缺少人员"}
+        try:
+            delta = int(delta)
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "调整值必须是整数"}
+        if delta == 0:
+            return {"ok": False, "error": "调整值不能为 0"}
+        if not -99 <= delta <= 99:
+            return {"ok": False, "error": "单次调整幅度太大"}
+
+        with self._people_lock:
+            known = {duty_person_key(p.to_dict()) for p in self.people}
+            if person_key not in known:
+                return {"ok": False, "error": "没有这个人"}
+
+            entry = clean_adjustment({"person": person_key, "delta": delta, "note": note})
+            if entry is None:
+                return {"ok": False, "error": "调整参数不合法"}
+            self.adjustments.append(entry)
+            save_adjustments(self.adjustments, self.adjust_path)
+
+        payload = self.get_duty()
+        payload["ok"] = True
+        return payload
+
+    def undo_adjustment(self, adjust_id) -> dict:
+        """撤销一条手动调整（按流水 id）。"""
+        target = str(adjust_id or "")
+        with self._people_lock:
+            before = len(self.adjustments)
+            self.adjustments = [a for a in self.adjustments if a["id"] != target]
+            if len(self.adjustments) != before:
+                save_adjustments(self.adjustments, self.adjust_path)
+            else:
+                return {"ok": False, "error": "没找到这条记录"}
+
+        payload = self.get_duty()
+        payload["ok"] = True
+        return payload
 
     def generate_duty(self, week, groups) -> dict:
         try:
@@ -645,7 +718,45 @@ class Api:
             if slot is None:
                 return {"ok": False, "error": "没找到这个班次"}
 
-            field = "hall" if role == "hall" else ("minister" if slot["kind"] == "dual" else "person")
+            if slot["kind"] == "dual":
+                if role not in ("minister", "hall"):
+                    return {"ok": False, "error": "这个班次只能换部长或台务"}
+                field = role
+            else:
+                if role != "member":
+                    return {"ok": False, "error": "这个班次只能换部员"}
+                field = "person"
+
+            # ---- 服务端校验：前端只给合法候选，但接口本身必须设防 ----
+            # 不校验的话，一次并发/过期请求就能把「当时有课的人」或
+            # 「本周已经值过的人」写进值班表，破坏每周 1 次的规则。
+            people = [p.to_dict() for p in self.people]
+            specials = [dict(s) for s in self.specials]
+
+            target = None
+            for person in people:
+                if duty_person_key(person) == person_key:
+                    target = person
+                    break
+            if target is None:
+                return {"ok": False, "error": "没有这个人"}
+
+            role_group = (roster.get("groups") or {}).get(
+                "hall" if role == "hall" else ("minister" if slot["kind"] == "dual" else "member")
+            )
+            if role_group and (target.get("group") or "") != role_group:
+                return {"ok": False, "error": f"这个人不在「{role_group}」分组里"}
+
+            if is_busy(target, specials, person_key, day, slot["start"], slot["end"], week):
+                return {"ok": False, "error": "这个人该时段没空（有课或手动标了忙）"}
+
+            for item in roster["assignments"]:
+                if item["day"] == day and item["block"] == block:
+                    continue  # 正在被替换的这个班次不算
+                keys = [item.get("person"), item.get("minister"), item.get("hall")]
+                if person_key in [k for k in keys if k]:
+                    return {"ok": False, "error": "这个人本周已经排过班（每周最多 1 次）"}
+
             slot[field] = person_key
             roster["assignments"] = [
                 item for item in roster["assignments"]

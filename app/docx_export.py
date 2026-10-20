@@ -32,13 +32,29 @@ def template_path() -> str:
 
 
 def _set_paragraph_text(paragraph, text: str) -> None:
-    """替换段落文字，同时保留第一段 run 的格式（字号 / 字体）。"""
+    """替换段落文字，同时保留格式（字号 / 字体）。
+
+    有 run 时沿用第一个 run 的格式；空段落没有 run，直接 add_run 会掉到
+    文档默认字体（实测：模板表格是黑体，新加的字变成了 Arial）。
+    模板作者在段落标记（pPr/rPr）上留了格式，复制给新 run 即可一致。
+    """
     if paragraph.runs:
         paragraph.runs[0].text = text
         for run in paragraph.runs[1:]:
             run.text = ""
-    else:
-        paragraph.add_run(text)
+        return
+
+    from copy import deepcopy
+
+    from docx.oxml.ns import qn
+
+    run = paragraph.add_run(text)
+    pPr = paragraph._p.pPr
+    if pPr is None:
+        return
+    mark_rpr = pPr.find(qn("w:rPr"))
+    if mark_rpr is not None:
+        run._element.insert(0, deepcopy(mark_rpr))
 
 
 def _set_cell_text(cell, text: str) -> None:

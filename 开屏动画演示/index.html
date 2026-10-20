@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>开屏动画 · ALL FOR SYNUTV（演示）</title>
+<style>
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; }
+  body{
+    background:#f3f3f3; color:#1b1b1b; font-family:"Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:24px;
+  }
+
+  /* ===== 模拟应用窗口 ===== */
+  .window{
+    position:relative; width:min(1000px, 94vw); height:min(620px, 72vh);
+    border-radius:10px; overflow:hidden; background:#fff;
+    box-shadow:0 18px 46px rgba(0,0,0,.18), 0 0 0 1px rgba(0,0,0,.06);
+  }
+  /* 退场后露出来的应用轮廓（只为让出场有个落点） */
+  .app{ display:flex; height:100%; }
+  .rail{ width:64px; flex:none; border-right:1px solid #ececec; padding:16px 0; display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .rail i{ width:18px; height:18px; border-radius:4px; background:#e6e6e6; display:block; }
+  .rail i.on{ background:#cfe4f7; }
+  .body{ flex:1; display:flex; flex-direction:column; }
+  .bar{ height:38px; border-bottom:1px solid #ececec; display:flex; align-items:center; gap:8px; padding:0 14px; }
+  .bar u{ text-decoration:none; height:8px; border-radius:4px; background:#ededed; display:block; }
+  .main{ flex:1; display:flex; }
+  .side{ width:180px; flex:none; border-right:1px solid #ececec; padding:14px 12px; display:flex; flex-direction:column; gap:10px; }
+  .side u{ text-decoration:none; height:7px; border-radius:4px; background:#efefef; display:block; }
+  .grid{ flex:1; padding:16px; display:grid; grid-template-columns:repeat(6,1fr); gap:8px; align-content:start; }
+  .grid span{ height:34px; border-radius:5px; background:#f4f4f4; }
+
+  /* ===== 开屏层 ===== */
+  .splash{
+    position:absolute; inset:0; z-index:5;
+    background:#0078d4;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:26px;
+  }
+  .mark{
+    width:54px; height:54px; border-radius:15px;
+    background:rgba(255,255,255,.16);
+    color:#fff; font-size:25px; font-weight:600;
+    display:flex; align-items:center; justify-content:center;
+    opacity:0; transform:scale(.86);
+  }
+  .line{ display:flex; align-items:baseline; gap:16px; }
+  .w{
+    color:#fff; font-size:30px; font-weight:600; letter-spacing:.18em;
+    opacity:0; transform:translateY(10px);
+    /* 让 letter-spacing 右侧不额外撑开，视觉更居中 */
+    margin-right:-.18em;
+  }
+  .rule{
+    width:0; height:1px; background:rgba(255,255,255,.5);
+  }
+
+  /* ===== 入场 ===== */
+  .splash.in .mark{ animation:markIn .40s cubic-bezier(.2,.8,.2,1) .05s both; }
+  .splash.in .w:nth-child(1){ animation:wordIn .48s cubic-bezier(.2,.8,.2,1) .22s both; }
+  .splash.in .w:nth-child(2){ animation:wordIn .48s cubic-bezier(.2,.8,.2,1) .34s both; }
+  .splash.in .w:nth-child(3){ animation:wordIn .48s cubic-bezier(.2,.8,.2,1) .46s both; }
+  .splash.in .rule{ animation:ruleIn .55s cubic-bezier(.2,.8,.2,1) .60s both; }
+
+  /* ===== 出场 ===== */
+  .splash.out{ animation:splashOut .46s cubic-bezier(.4,0,.6,1) both; }
+
+  @keyframes markIn{
+    from{ opacity:0; transform:scale(.86); }
+    to{ opacity:1; transform:scale(1); }
+  }
+  @keyframes wordIn{
+    from{ opacity:0; transform:translateY(10px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+  @keyframes ruleIn{
+    from{ width:0; }
+    to{ width:96px; }
+  }
+  @keyframes splashOut{
+    from{ opacity:1; transform:scale(1); }
+    to{ opacity:0; transform:scale(1.035); }
+  }
+
+  /* ===== 控制条 ===== */
+  .controls{ display:flex; align-items:center; gap:14px; font-size:13px; color:#555; }
+  button{
+    font-family:inherit; font-size:13px; height:32px; padding:0 14px; border-radius:6px;
+    border:1px solid #d6d6d6; background:#fff; color:#1b1b1b; cursor:pointer;
+  }
+  button:hover{ background:#f0f0f0; }
+  .hint{ font-size:12px; color:#888; max-width:760px; line-height:1.7; text-align:center; }
+  .hint b{ color:#333; font-weight:600; }
+
+  @media (prefers-reduced-motion: reduce){
+    .splash.in .mark, .splash.in .w, .splash.in .rule, .splash.out{ animation-duration:.01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="window" id="window">
+    <!-- 退场后露出来的应用（示意） -->
+    <div class="app">
+      <div class="rail">
+        <i></i><i class="on"></i><i></i><i></i><i></i>
+      </div>
+      <div class="body">
+        <div class="bar">
+          <u style="width:70px"></u><u style="width:46px"></u><u style="width:86px"></u>
+          <u style="width:120px; margin-left:auto"></u>
+        </div>
+        <div class="main">
+          <div class="side">
+            <u style="width:60px"></u><u style="width:90px"></u><u style="width:76px"></u>
+            <u style="width:84px"></u><u style="width:64px"></u><u style="width:80px"></u>
+          </div>
+          <div class="grid">
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 开屏层 -->
+    <div class="splash" id="splash">
+      <div class="mark">时</div>
+      <div class="line">
+        <span class="w">ALL</span><span class="w">FOR</span><span class="w">SYNUTV</span>
+      </div>
+      <div class="rule"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="replay" type="button">重播</button>
+    <span id="timing">入场 1.15s · 停留 0.55s · 出场 0.46s</span>
+  </div>
+
+  <div class="hint">
+    真实接入时，<b>出场由「数据加载完成」触发</b>，不是定时器——
+    机器快就先撤，机器慢就一直盖着，避免「加载完了还在播动画」的强行等待。
+  </div>
+
+<script>
+(function(){
+  "use strict";
+
+  var splash = document.getElementById('splash');
+  var HOLD = 1700;          // 入场结束到出场开始的停留时间（演示用）
+  var timer = null;
+
+  function play(){
+    clearTimeout(timer);
+    splash.classList.remove('in', 'out');
+    // 强制重排，先回到初始态，否则连点重播不会重新播
+    void splash.offsetWidth;
+    splash.classList.add('in');
+
+    // 演示里是定时出场；真实接入时改成数据就绪后的回调
+    timer = setTimeout(function(){
+      splash.classList.add('out');
+    }, HOLD);
+  }
+
+  document.getElementById('replay').addEventListener('click', play);
+
+  // 打开就播一遍
+  play();
+})();
+</script>
+</body>
+</html>

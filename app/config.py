@@ -1,8 +1,8 @@
 """应用元信息与品牌配置。"""
 
-# 产品名
-APP_NAME = "空课表PRO"
-VERSION = "3.3.1"
+# 产品名（界面展示用；打包出的文件名是 ASCII 的 ChronoHub，见 packaging/ChronoHub.spec）
+APP_NAME = "时枢 ChronoHub"
+VERSION = "3.3.2"
 
 # 组织 / 项目线标识。产品名独立，但组织标识仍保留在「关于」页展示。
 ORG_NAME = "SYNUTV"

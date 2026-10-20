@@ -1,11 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller 打包配置 —— 空课表PRO。
+"""PyInstaller 打包配置 —— 时枢 ChronoHub。
 
 构建（在仓库根目录执行）：
-    python -m PyInstaller packaging/KongKeBiaoPRO.spec --noconfirm --clean
+    python -m PyInstaller packaging/ChronoHub.spec --noconfirm --clean
 
 产出：
-    dist/空课表PRO.exe     单文件版（onefile）
+    dist/ChronoHub.exe     单文件版（onefile）
 
 为什么用 onefile：便于直接发给别人，双击即用。
 代价是每次启动要把 PySide6 + QtWebEngine 解压到临时目录，首次启动偏慢。
@@ -25,7 +25,8 @@ import os
 SPEC_DIR = os.path.dirname(os.path.abspath(SPEC))
 ROOT = os.path.dirname(SPEC_DIR)
 
-APP_NAME = "空课表PRO"
+# 仅用作产物文件名（ASCII，避免中文+英文混在路径里）
+APP_NAME = "ChronoHub"
 ICON = os.path.join(SPEC_DIR, f"{APP_NAME}.ico")
 
 hiddenimports = [

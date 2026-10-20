@@ -1,4 +1,4 @@
-"""空课表PRO 主程序入口。
+"""时枢 ChronoHub 主程序入口。
 
 架构要点
 --------
@@ -119,7 +119,7 @@ def _tk_selfcheck() -> int:
     这些在开发环境下一定正常，打包后可能因为数据文件/DLL 没带全而失败——
     而且只有用户点下去时才暴露。所以留一个可主动验证的入口：
 
-        .\\空课表PRO.exe --selfcheck      （--tk-check 是它的别名）
+        .\\ChronoHub.exe --selfcheck      （--tk-check 是它的别名）
 
     结果写到 data/logs/selfcheck.log。
     """

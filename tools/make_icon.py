@@ -1,11 +1,11 @@
 """生成应用图标（.ico）。
 
 设计上刻意与界面保持一致：应用里左上角和「关于」页的 logo 就是
-**主题色圆角方块 + 白色「空」字**，图标沿用同一套，避免出现两套视觉。
+**主题色圆角方块 + 白色「时」字**，图标沿用同一套，避免出现两套视觉。
 
 用脚本生成而不是塞一个二进制文件进仓库：可复现、可调、来源清楚。
 运行：python tools/make_icon.py
-产出：packaging/空课表PRO.ico
+产出：packaging/ChronoHub.ico
 """
 
 from __future__ import annotations
@@ -18,11 +18,11 @@ from PIL import Image, ImageDraw, ImageFont
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 OUT_DIR = os.path.join(ROOT, "packaging")
-OUT_PATH = os.path.join(OUT_DIR, "空课表PRO.ico")
+OUT_PATH = os.path.join(OUT_DIR, "ChronoHub.ico")
 
 # 与 web/index.html 的 --win-accent 保持一致
 ACCENT = (0x00, 0x78, 0xD4)
-GLYPH = "空"
+GLYPH = "时"
 
 # 优先用粗体，退到常规，再退到黑体
 FONT_CANDIDATES = (

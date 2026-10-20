@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>空课表PRO</title>
+  <title>时枢 ChronoHub</title>
   <style>
     :root{ color-scheme: light dark; }
     html, body{ margin:0; height:100%; }
@@ -389,8 +389,8 @@
 <body>
   <div class="win-titlebar">
     <div class="win-titlebar-left">
-      <span class="win-logo">空</span>
-      <span class="win-title">空课表PRO</span>
+      <span class="win-logo">时</span>
+      <span class="win-title">时枢 ChronoHub</span>
       <span class="win-version" id="app-version"></span>
     </div>
     <div class="win-controls">
@@ -605,8 +605,8 @@
         <div class="about-view">
           <div class="about-box">
             <div class="about-big-logo">空</div>
-            <div class="about-big-name" id="about-big-name">空课表PRO</div>
-            <div class="about-big-version" id="about-big-version">v3.3.1</div>
+            <div class="about-big-name" id="about-big-name">时枢 ChronoHub</div>
+            <div class="about-big-version" id="about-big-version">v3.3.2</div>
             <div class="about-note" id="about-note"></div>
             <div class="about-grid">
               <div class="about-cell"><b>账号与安全</b><span>账号存 SQLite，密码用 Windows DPAPI 加密</span></div>
@@ -907,7 +907,7 @@
       ];
 
       var DEFAULT_APP_INFO = {
-        name:'空课表PRO', version:'3.3.1', org:'SYNUTV',
+        name:'时枢 ChronoHub', version:'3.3.2', org:'SYNUTV',
         developer:'阿山', contact:'ashan441@163.com',
         copyright:'© 2026 阿山',
         merged_from:'由「教务系统管理器 v1.0.0」与「多人空课表 v2.1」合并'
@@ -2480,7 +2480,7 @@
           left.textContent = '内嵌 Chromium 内核（QtWebEngine）· 自动登录与导出都在应用窗口内完成';
           right.textContent = browserState.loggedName ? ('已登录：' + browserState.loggedName) : '未登录';
         } else if(view === 'about'){
-          left.textContent = '空课表PRO · 由「教务系统管理器」与「多人空课表」合并';
+          left.textContent = '时枢 ChronoHub · 由「教务系统管理器」与「多人空课表」合并';
           right.textContent = 'v' + (DEFAULT_APP_INFO.version || '');
         } else {
           updateStatus();
@@ -2724,7 +2724,7 @@
       var DEFAULT_BROWSER_HINT =
         '点「打开并登录」，教务系统页面会直接显示在这个窗口里（内嵌 Chromium），并自动填入账号密码。' +
         '登录后点「导出课表 PDF」，导出的文件会自动解析并合并进「空课表」，不需要再手动选文件。' +
-        '内嵌页面显示时，可以用它顶部的「← 返回 空课表PRO」回到应用。';
+        '内嵌页面显示时，可以用它顶部的「← 返回 时枢 ChronoHub」回到应用。';
 
       function ensureBrowserPoll(){
         if(browserPoll || !isDesktop()) return;

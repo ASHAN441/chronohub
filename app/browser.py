@@ -208,7 +208,7 @@ class EmbeddedBrowser(QObject):
         bar_layout.setContentsMargins(8, 5, 8, 5)
         bar_layout.setSpacing(6)
 
-        back = QPushButton("← 返回 空课表PRO")
+        back = QPushButton("← 返回 时枢 ChronoHub")
         back.setFixedHeight(28)
         back.clicked.connect(self.hide)
         bar_layout.addWidget(back)

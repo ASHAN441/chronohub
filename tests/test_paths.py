@@ -18,7 +18,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 注意要用 abspath 规整：os.path.join(os.sep, "some", ...) 在 Windows 上得到的是
 # 驱动器相对路径（\some\dir），而 paths 内部会做 abspath，两边对不上。
 FAKE_DIR = os.path.abspath(os.path.join(os.sep, "some", "dir"))
-FAKE_EXE = os.path.join(FAKE_DIR, "空课表PRO.exe")
+FAKE_EXE = os.path.join(FAKE_DIR, "ChronoHub.exe")
 FAKE_MEIPASS = os.path.abspath(os.path.join(os.sep, "tmp", "_MEI123456"))
 
 
@@ -81,11 +81,11 @@ class ResourceLayoutTest(unittest.TestCase):
         self.assertTrue(os.path.exists(index), f"缺少界面文件：{index}")
 
     def test_icon_exists_for_build(self):
-        icon = os.path.join(ROOT, "packaging", "空课表PRO.ico")
+        icon = os.path.join(ROOT, "packaging", "ChronoHub.ico")
         self.assertTrue(os.path.exists(icon), f"缺少打包图标：{icon}")
 
     def test_spec_exists_and_points_at_web(self):
-        spec = os.path.join(ROOT, "packaging", "KongKeBiaoPRO.spec")
+        spec = os.path.join(ROOT, "packaging", "ChronoHub.spec")
         self.assertTrue(os.path.exists(spec))
         with open(spec, encoding="utf-8") as handle:
             content = handle.read()
@@ -94,7 +94,7 @@ class ResourceLayoutTest(unittest.TestCase):
 
     def test_spec_bundles_duty_template(self):
         """值班表导出模板必须打进包里，否则打包后一点「导出」就报找不到模板。"""
-        spec = os.path.join(ROOT, "packaging", "KongKeBiaoPRO.spec")
+        spec = os.path.join(ROOT, "packaging", "ChronoHub.spec")
         with open(spec, encoding="utf-8") as handle:
             content = handle.read()
         self.assertIn("值班表.docx", content, "spec 必须把值班表模板一起打包")

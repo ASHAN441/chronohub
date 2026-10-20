@@ -318,6 +318,49 @@
       color:#c42b1c; border-color:color-mix(in srgb, #c42b1c 45%, var(--win-border));
       background:color-mix(in srgb, #c42b1c 10%, var(--win-surface));
     }
+    /* ===== 排值班表（v3.3.1 新增） ===== */
+    .duty-main{ flex:1; min-height:0; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:12px; }
+    .duty-table-wrap{ overflow:auto; border:1px solid var(--win-border); border-radius:7px; background:var(--win-border); }
+    .duty-table{ width:100%; border-collapse:separate; border-spacing:1px; table-layout:fixed; }
+    .duty-table th, .duty-table td{ background:var(--win-surface); padding:7px 8px; font-size:12.5px; text-align:center; }
+    .duty-table thead th{ color:var(--win-text-muted); font-weight:600; font-size:12px; }
+    .duty-table tbody th{ color:var(--win-text-muted); font-weight:500; width:112px; font-size:12px; line-height:1.4; }
+    .duty-table td{ cursor:pointer; position:relative; }
+    .duty-table td:hover{ outline:1px solid var(--win-accent); outline-offset:-1px; }
+    .duty-name{ font-weight:500; }
+    .duty-cell-meta{ display:block; font-size:10.5px; color:var(--win-text-muted); margin-top:1px; }
+    .duty-table td.open{ background:color-mix(in srgb, #c42b1c 12%, var(--win-surface)); color:#c42b1c; font-weight:600; }
+    .duty-table td.open .duty-cell-meta{ color:color-mix(in srgb, #c42b1c 70%, var(--win-text-muted)); }
+    .duty-dual{ display:flex; flex-direction:column; gap:2px; line-height:1.45; }
+    .duty-dual span{ font-size:12px; }
+    .duty-dual .role{ color:var(--win-text-muted); font-size:10.5px; margin-right:3px; }
+    .duty-empty-row td{ color:var(--win-text-muted); padding:26px; font-size:12.5px; cursor:default; }
+    .duty-empty-row td:hover{ outline:none; }
+    .duty-summary{ display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--win-text-muted); }
+    .duty-summary b{ color:var(--win-text); font-weight:600; }
+    .duty-summary .warn b{ color:#c42b1c; }
+    .duty-counts{ border-top:1px solid var(--win-border); padding-top:11px; }
+    .duty-counts-head{ display:flex; align-items:center; gap:8px; font-size:12.5px; margin-bottom:8px; }
+    .duty-counts-head span{ font-size:11.5px; color:var(--win-text-muted); }
+    .duty-search{ width:170px; height:26px; font-size:12px; }
+    .duty-groups{ display:flex; flex-direction:column; gap:10px; max-height:215px; overflow-y:auto; }
+    .duty-group-title{ font-size:11.5px; color:var(--win-text-muted); margin-bottom:5px; }
+    .duty-chip-row{ display:flex; flex-wrap:wrap; gap:5px; }
+    .duty-chip{ display:inline-flex; align-items:center; gap:5px; font-size:12px; border:1px solid var(--win-border);
+      background:var(--win-surface); color:var(--win-text); border-radius:999px; padding:2px 9px; }
+    .duty-chip .cnt{ color:var(--win-text-muted); font-size:11px; }
+    .duty-chip.on{ border-color:color-mix(in srgb, var(--win-accent) 45%, var(--win-border)); background:var(--win-accent-soft); }
+    .duty-chip.on .cnt{ color:var(--win-accent); font-weight:600; }
+    .duty-chip.muted{ opacity:.55; }
+    .duty-picker{ position:fixed; z-index:60; width:220px; max-height:270px; overflow-y:auto;
+      background:var(--win-surface); border:1px solid var(--win-border); border-radius:7px;
+      box-shadow:0 10px 28px rgba(0,0,0,.24); padding:6px; }
+    .duty-picker-title{ font-size:11px; color:var(--win-text-muted); padding:3px 6px 6px; }
+    .duty-picker-item{ display:flex; align-items:center; justify-content:space-between; gap:8px;
+      padding:5px 7px; border-radius:5px; cursor:pointer; font-size:12.5px; }
+    .duty-picker-item:hover{ background:var(--win-surface-3); }
+    .duty-picker-item .c{ font-size:11px; color:var(--win-text-muted); }
+    .duty-picker-empty{ font-size:12px; color:var(--win-text-muted); padding:8px; text-align:center; line-height:1.7; }
   </style>
 </head>
 <body>
@@ -349,6 +392,10 @@
       <button class="rail-item" data-view="browser" type="button">
         <svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2.2"/><path d="M3 9h18"/><path d="M7 6.7h.01M9.6 6.7h.01"/></svg>
         课表导出
+      </button>
+      <button class="rail-item" data-view="duty" type="button" id="rail-duty">
+        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="15" rx="2.2"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="M9 14h2M13 14h2M9 17h2"/></svg>
+        排值班表
       </button>
       <span class="rail-spacer"></span>
       <button class="rail-item" data-view="about" type="button">
@@ -417,6 +464,49 @@
       </div>
     </main>
   </div>
+      </section>
+
+      <!-- ============ 排值班表 ============ -->
+      <section class="view" id="view-duty">
+        <div class="win-toolbar">
+          <label class="tb-field">部员组
+            <select class="tb-select" id="duty-member-group"></select>
+          </label>
+          <label class="tb-field">部长组
+            <select class="tb-select" id="duty-minister-group"></select>
+          </label>
+          <label class="tb-field">台务组
+            <select class="tb-select" id="duty-hall-group"></select>
+          </label>
+          <label class="tb-field">周次
+            <select class="tb-select" id="duty-week"></select>
+          </label>
+          <button class="tb-btn primary" id="duty-generate" type="button">生成</button>
+          <button class="tb-btn" id="duty-reroll" type="button">重新随机</button>
+          <button class="tb-btn" id="duty-export" type="button">导出 Word</button>
+          <span class="tb-spacer"></span>
+          <button class="tb-btn" id="duty-clear" type="button">清除本周</button>
+        </div>
+
+        <div class="duty-main">
+          <div class="duty-table-wrap">
+            <table class="duty-table">
+              <thead id="duty-head"></thead>
+              <tbody id="duty-body"></tbody>
+            </table>
+          </div>
+          <div class="duty-summary" id="duty-summary"></div>
+          <div class="duty-counts">
+            <div class="duty-counts-head">
+              <b>累计值班次数</b>
+              <span id="duty-count-hint"></span>
+              <span style="margin-left:auto"></span>
+              <input class="win-input duty-search" id="duty-search" type="search"
+                     placeholder="搜索姓名" autocomplete="off">
+            </div>
+            <div class="duty-groups" id="duty-groups"></div>
+          </div>
+        </div>
       </section>
 
       <!-- ============ 账号管理（来自原「教务系统管理器」） ============ -->
@@ -2309,7 +2399,7 @@
       /* =========================================================
          合并后新增 —— 视图切换（左侧导航）
          ========================================================= */
-      var VIEWS = ['freetime', 'accounts', 'browser', 'about'];
+      var VIEWS = ['freetime', 'duty', 'accounts', 'browser', 'about'];
 
       function currentView(){
         var a = document.querySelector('.rail-item.active');
@@ -2331,6 +2421,8 @@
         }
         // 切到课表导出页时拉一次浏览器状态
         if(name === 'browser') ensureBrowserPoll();
+        // 切到值班表页时重新读一次数据（人员/分组可能变了）
+        if(name === 'duty') loadDuty();
         updateStatusbar();
       }
 
@@ -2844,6 +2936,7 @@
       bindRailNav();
       bindAccounts();
       bindSpecials();
+      bindDuty();
       updateStatusbar();
       // 账号列表与教务系统地址都依赖 js_api 桥，必须等桥注入完成再拉，
       // 否则 isDesktop() 会是 false 而误用兜底数据（踩过）。
@@ -3130,6 +3223,461 @@
         });
       }
 
+      /* =========================================================
+         排值班表（v3.3.1 新增）
+         1-8 节部员 · 9-10 节部长+台务 · 每人每周最多 1 次 · 次数累计历史
+         排班算法在后端（app/duty_scheduler.py），前端只负责展示与换人。
+         ========================================================= */
+
+      var MEMBER_BLOCK_LABELS = ['第1-2节', '第3-4节', '第5-6节', '第7-8节'];
+      var dutyState = { data: null, loaded: false };
+
+      function dutyWeek(){
+        return parseInt(document.getElementById('duty-week').value, 10) || 1;
+      }
+
+      function dutyGroups(){
+        return {
+          member: document.getElementById('duty-member-group').value,
+          minister: document.getElementById('duty-minister-group').value,
+          hall: document.getElementById('duty-hall-group').value
+        };
+      }
+
+      function buildDutyWeekSelect(){
+        var sel = document.getElementById('duty-week');
+        var html = '';
+        for(var w = 1; w <= 18; w++) html += '<option value="' + w + '">第 ' + w + ' 周</option>';
+        sel.innerHTML = html;
+        sel.value = '1';
+      }
+
+      function fillDutyGroupSelect(id, names, preferred){
+        var sel = document.getElementById(id);
+        if(!names.length){
+          sel.innerHTML = '<option value="">（没有分组）</option>';
+          return;
+        }
+        sel.innerHTML = names.map(function(n){
+          return '<option value="' + esc(n) + '">' + esc(n) + '</option>';
+        }).join('');
+        sel.value = names.indexOf(preferred) !== -1 ? preferred : names[0];
+      }
+
+      async function loadDuty(){
+        // 记住当前选的分组，重新加载后恢复——否则每次切页都跳回默认
+        var prev = {
+          member: document.getElementById('duty-member-group').value,
+          minister: document.getElementById('duty-minister-group').value,
+          hall: document.getElementById('duty-hall-group').value
+        };
+
+        if(!isDesktop()){
+          dutyState.data = { rosters: [], counts: {}, names: {}, groups: {},
+                             group_names: [], has_template: false };
+          dutyState.loaded = true;
+          renderDuty();
+          return;
+        }
+        try {
+          dutyState.data = await window.pywebview.api.get_duty();
+        } catch(e) {
+          dutyState.data = { rosters: [], counts: {}, names: {}, groups: {},
+                             group_names: [], has_template: false };
+        }
+        dutyState.loaded = true;
+
+        // 分组下拉：用真实存在的分组名，默认猜 部员/部长/台务
+        var names = (dutyState.data.group_names || []).slice();
+        fillDutyGroupSelect('duty-member-group', names, prev.member || '部员');
+        fillDutyGroupSelect('duty-minister-group', names, prev.minister || '部长');
+        fillDutyGroupSelect('duty-hall-group', names, prev.hall || '台务');
+        renderDuty();
+      }
+
+      function currentRoster(){
+        if(!dutyState.data) return null;
+        var week = dutyWeek();
+        var found = null;
+        (dutyState.data.rosters || []).forEach(function(r){
+          if(r.week === week) found = r;
+        });
+        return found;
+      }
+
+      function dutyPersonName(key){
+        var names = (dutyState.data && dutyState.data.names) || {};
+        return names[key] || key || '';
+      }
+
+      function dutyCountOf(key){
+        var counts = (dutyState.data && dutyState.data.counts) || {};
+        return counts[key] || 0;
+      }
+
+      function renderDuty(){
+        var head = document.getElementById('duty-head');
+        var body = document.getElementById('duty-body');
+        var week = dutyWeek();
+        var roster = currentRoster();
+
+        var headHtml = '<tr><th>节次</th>';
+        for(var d = 1; d <= 5; d++) headHtml += '<th>' + DAYS[d-1] + '</th>';
+        headHtml += '</tr>';
+        head.innerHTML = headHtml;
+
+        if(!roster){
+          body.innerHTML = '<tr class="duty-empty-row"><td colspan="6">第 ' + week +
+            ' 周还没有排班，选好三个分组后点「生成」</td></tr>';
+          document.getElementById('duty-summary').innerHTML = '';
+          renderDutyCounts();
+          return;
+        }
+
+        var byDayBlock = {};
+        var byDayDual = {};
+        roster.assignments.forEach(function(a){
+          if(a.kind === 'dual') byDayDual[a.day] = a;
+          else byDayBlock[a.day + '-' + a.block] = a;
+        });
+
+        var html = '';
+        var memberOpen = 0, dualOpen = 0;
+
+        for(var bi = 0; bi < MEMBER_BLOCK_LABELS.length; bi++){
+          html += '<tr><th>' + MEMBER_BLOCK_LABELS[bi] +
+                  '<br><span style="font-size:10.5px">部员</span></th>';
+          for(var day = 1; day <= 5; day++){
+            var item = byDayBlock[day + '-' + bi];
+            if(!item || !item.person){
+              memberOpen++;
+              html += '<td class="open" data-day="' + day + '" data-block="' + bi + '">无人可排' +
+                      '<span class="duty-cell-meta">点此换人</span></td>';
+            } else {
+              html += '<td data-day="' + day + '" data-block="' + bi + '">' +
+                      '<span class="duty-name">' + esc(dutyPersonName(item.person)) + '</span>' +
+                      '<span class="duty-cell-meta">' + dutyCountOf(item.person) + ' 次</span></td>';
+            }
+          }
+          html += '</tr>';
+        }
+
+        html += '<tr><th>第9-10节<br><span style="font-size:10.5px">部长 + 台务</span></th>';
+        for(var day2 = 1; day2 <= 5; day2++){
+          var dual = byDayDual[day2];
+          var minister = dual && dual.minister ? dual.minister : '';
+          var hall = dual && dual.hall ? dual.hall : '';
+          if(!minister || !hall) dualOpen++;
+          html += '<td' + ((!minister || !hall) ? ' class="open"' : '') +
+                  ' data-day="' + day2 + '" data-block="' + MEMBER_BLOCK_LABELS.length + '">' +
+                  '<div class="duty-dual">' +
+                    '<span><span class="role">部长</span>' +
+                      (minister ? esc(dutyPersonName(minister)) : '<b style="color:#c42b1c">缺</b>') + '</span>' +
+                    '<span><span class="role">台务</span>' +
+                      (hall ? esc(dutyPersonName(hall)) : '<b style="color:#c42b1c">缺</b>') + '</span>' +
+                  '</div></td>';
+        }
+        html += '</tr>';
+        body.innerHTML = html;
+
+        var totalMember = 5 * MEMBER_BLOCK_LABELS.length;
+        var used = {};
+        roster.assignments.forEach(function(a){
+          if(a.kind === 'dual'){
+            if(a.minister) used[a.minister] = true;
+            if(a.hall) used[a.hall] = true;
+          } else if(a.person){
+            used[a.person] = true;
+          }
+        });
+
+        document.getElementById('duty-summary').innerHTML =
+          '<span>1-8节 <b>' + totalMember + '</b> 个班次 · 已排 <b>' + (totalMember - memberOpen) + '</b></span>' +
+          (memberOpen ? '<span class="warn">缺 <b>' + memberOpen + '</b> 个</span>' : '') +
+          (dualOpen ? '<span class="warn">9-10节缺 <b>' + dualOpen + '</b> 天</span>' : '') +
+          '<span>本周参与 <b>' + Object.keys(used).length + '</b> 人</span>' +
+          '<span>（' + esc(roster.groups.member || '—') + ' / ' +
+            esc(roster.groups.minister || '—') + ' / ' + esc(roster.groups.hall || '—') + '）</span>';
+
+        renderDutyCounts();
+      }
+
+      function renderDutyCounts(){
+        var box = document.getElementById('duty-groups');
+        var data = dutyState.data;
+        if(!data || !data.names || !Object.keys(data.names).length){
+          box.innerHTML = '<div class="duty-empty-row" style="color:var(--win-text-muted);text-align:center;padding:14px">还没有人员数据</div>';
+          document.getElementById('duty-count-hint').textContent = '';
+          return;
+        }
+
+        var keyword = (document.getElementById('duty-search').value || '').trim().toLowerCase();
+        var safeKeyword = esc(keyword);
+
+        var roster = currentRoster();
+        var used = {};
+        if(roster){
+          roster.assignments.forEach(function(a){
+            if(a.kind === 'dual'){
+              if(a.minister) used[a.minister] = true;
+              if(a.hall) used[a.hall] = true;
+            } else if(a.person){
+              used[a.person] = true;
+            }
+          });
+        }
+
+        // 按分组归集
+        var buckets = {};
+        Object.keys(data.names).forEach(function(key){
+          var group = (data.groups && data.groups[key]) || '未分组';
+          (buckets[group] = buckets[group] || []).push(key);
+        });
+
+        var groupNames = Object.keys(buckets).sort();
+        var html = '';
+        groupNames.forEach(function(group){
+          var keys = buckets[group].filter(function(key){
+            if(!keyword) return true;
+            return String(data.names[key] || '').toLowerCase().indexOf(keyword) !== -1;
+          }).sort(function(a, b){
+            return dutyCountOf(b) - dutyCountOf(a) ||
+                   String(data.names[a]).localeCompare(String(data.names[b]));
+          });
+          if(!keys.length) return;
+
+          html += '<div><div class="duty-group-title">' + esc(group) + ' · ' + keys.length + ' 人</div>' +
+            '<div class="duty-chip-row">' +
+              keys.map(function(key){
+                var on = !!used[key];
+                return '<span class="duty-chip' + (on ? ' on' : ' muted') + '">' +
+                  esc(data.names[key]) + '<span class="cnt">' + dutyCountOf(key) + ' 次</span></span>';
+              }).join('') +
+            '</div></div>';
+        });
+
+        box.innerHTML = html ||
+          '<div style="color:var(--win-text-muted);text-align:center;padding:14px;font-size:12px">没有匹配「' +
+          safeKeyword + '」的人</div>';
+        document.getElementById('duty-count-hint').textContent = '（含历史累计；高亮为本周值班）';
+      }
+
+      /* ---------- 换人 ---------- */
+      function closeDutyPicker(){
+        var old = document.querySelector('.duty-picker');
+        if(old) old.remove();
+      }
+
+      function placeDutyPicker(box, td){
+        var rect = td.getBoundingClientRect();
+        box.style.left = Math.min(rect.left, window.innerWidth - 236) + 'px';
+        box.style.top = Math.min(rect.bottom + 4, window.innerHeight - 280) + 'px';
+        document.body.appendChild(box);
+      }
+
+      async function openDutyPicker(td){
+        closeDutyPicker();
+        var roster = currentRoster();
+        if(!roster) return;
+        if(!isDesktop()){ showToast('浏览器预览模式：请在桌面应用中排班'); return; }
+
+        var day = parseInt(td.getAttribute('data-day'), 10);
+        var block = parseInt(td.getAttribute('data-block'), 10);
+        if(isNaN(day) || isNaN(block)) return;
+
+        var isDual = block === MEMBER_BLOCK_LABELS.length;
+        var box = document.createElement('div');
+        box.className = 'duty-picker';
+
+        if(isDual){
+          var dual = null;
+          roster.assignments.forEach(function(a){
+            if(a.kind === 'dual' && a.day === day) dual = a;
+          });
+          box.innerHTML =
+            '<div class="duty-picker-title">' + DAYS[day-1] + ' 第9-10节 · 换谁</div>' +
+            '<div class="duty-picker-item" data-role="minister"><span>换部长</span>' +
+              '<span class="c">当前：' + esc(dual && dual.minister ? dutyPersonName(dual.minister) : '缺') + '</span></div>' +
+            '<div class="duty-picker-item" data-role="hall"><span>换台务</span>' +
+              '<span class="c">当前：' + esc(dual && dual.hall ? dutyPersonName(dual.hall) : '缺') + '</span></div>';
+          placeDutyPicker(box, td);
+          box.addEventListener('click', function(e){
+            var item = e.target.closest ? e.target.closest('[data-role]') : null;
+            if(!item) return;
+            openDutyRolePicker(td, day, block, item.getAttribute('data-role'));
+          });
+          return;
+        }
+
+        var res = null;
+        try {
+          res = await window.pywebview.api.duty_candidates(roster.week, day, block, 'member');
+        } catch(e) {
+          showToast('读取候选失败：' + (e && e.message ? e.message : e));
+          return;
+        }
+        var list = (res && res.candidates) || [];
+        box.innerHTML = '<div class="duty-picker-title">' + DAYS[day-1] + ' ' +
+            MEMBER_BLOCK_LABELS[block] + ' · 可换的部员</div>' +
+          (list.length
+            ? list.map(function(p){
+                return '<div class="duty-picker-item" data-pick="' + esc(p.key) + '">' +
+                  '<span>' + esc(p.name) + '</span>' +
+                  '<span class="c">' + dutyCountOf(p.key) + ' 次</span></div>';
+              }).join('')
+            : '<div class="duty-picker-empty">这个时段没有可换的人<br>（都有课或本周已排）</div>');
+
+        placeDutyPicker(box, td);
+        box.addEventListener('click', function(e){
+          var item = e.target.closest ? e.target.closest('[data-pick]') : null;
+          if(!item) return;
+          doDutySwap(day, block, 'member', item.getAttribute('data-pick'));
+        });
+      }
+
+      async function openDutyRolePicker(td, day, block, role){
+        closeDutyPicker();
+        var roster = currentRoster();
+        if(!roster) return;
+
+        var res = null;
+        try {
+          res = await window.pywebview.api.duty_candidates(roster.week, day, block, role);
+        } catch(e) {
+          showToast('读取候选失败：' + (e && e.message ? e.message : e));
+          return;
+        }
+        var list = (res && res.candidates) || [];
+
+        var box = document.createElement('div');
+        box.className = 'duty-picker';
+        box.innerHTML = '<div class="duty-picker-title">' +
+            (role === 'hall' ? '选台务' : '选部长') + ' · ' + DAYS[day-1] + ' 第9-10节</div>' +
+          (list.length
+            ? list.map(function(p){
+                return '<div class="duty-picker-item" data-pick="' + esc(p.key) + '">' +
+                  '<span>' + esc(p.name) + '</span>' +
+                  '<span class="c">' + dutyCountOf(p.key) + ' 次</span></div>';
+              }).join('')
+            : '<div class="duty-picker-empty">没有可换的人</div>');
+
+        placeDutyPicker(box, td);
+        box.addEventListener('click', function(e){
+          var item = e.target.closest ? e.target.closest('[data-pick]') : null;
+          if(!item) return;
+          doDutySwap(day, block, role, item.getAttribute('data-pick'));
+        });
+      }
+
+      async function doDutySwap(day, block, role, personKey){
+        var roster = currentRoster();
+        if(!roster) return;
+        closeDutyPicker();
+        try {
+          var res = await window.pywebview.api.swap_duty(roster.week, day, block, role, personKey);
+          if(!res || res.ok === false){
+            showToast('换人失败：' + ((res && res.error) || '未知错误'));
+            return;
+          }
+          dutyState.data = res;
+          renderDuty();
+        } catch(e) {
+          showToast('换人失败：' + (e && e.message ? e.message : e));
+        }
+      }
+
+      /* ---------- 生成 / 导出 / 清除 ---------- */
+      async function generateDuty(){
+        if(!isDesktop()){ showToast('浏览器预览模式：请在桌面应用中排班'); return; }
+        var groups = dutyGroups();
+        if(!groups.member && !groups.minister && !groups.hall){
+          showToast('请先选择部员组 / 部长组 / 台务组');
+          return;
+        }
+        var week = dutyWeek();
+        try {
+          var res = await window.pywebview.api.generate_duty(week, groups);
+          if(!res || res.ok === false){
+            showToast('排班失败：' + ((res && res.error) || '未知错误'));
+            return;
+          }
+          dutyState.data = res;
+          renderDuty();
+          showToast('第 ' + week + ' 周已排好');
+        } catch(e) {
+          showToast('排班失败：' + (e && e.message ? e.message : e));
+        }
+      }
+
+      async function exportDuty(){
+        if(!isDesktop()){ showToast('浏览器预览模式：请在桌面应用中导出'); return; }
+        var roster = currentRoster();
+        if(!roster){ showToast('这一周还没有排班'); return; }
+        try {
+          var res = await window.pywebview.api.export_duty(roster.week);
+          if(!res || res.ok === false){
+            var msg = (res && res.error) || '未知错误';
+            if(msg !== '已取消') showToast('导出失败：' + msg);
+            return;
+          }
+          showToast('已导出：' + res.path);
+        } catch(e) {
+          showToast('导出失败：' + (e && e.message ? e.message : e));
+        }
+      }
+
+      function clearDuty(){
+        var roster = currentRoster();
+        if(!roster){ showToast('这一周还没有排班'); return; }
+        if(!isDesktop()){ showToast('浏览器预览模式无法清除'); return; }
+        openConfirm('清除排班',
+          '确定删除第 ' + roster.week + ' 周的排班？累计次数会相应回落。',
+          function(){ doClearDuty(roster.week); });
+      }
+
+      async function doClearDuty(week){
+        try {
+          var res = await window.pywebview.api.clear_duty(week);
+          if(res && res.ok === false){ showToast('清除失败：' + (res.error || '未知错误')); return; }
+          dutyState.data = res;
+          renderDuty();
+          showToast('已清除第 ' + week + ' 周的排班');
+        } catch(e) {
+          showToast('清除失败：' + (e && e.message ? e.message : e));
+        }
+      }
+
+      function bindDuty(){
+        buildDutyWeekSelect();
+
+        document.getElementById('duty-generate').addEventListener('click', generateDuty);
+        document.getElementById('duty-reroll').addEventListener('click', generateDuty);
+        document.getElementById('duty-export').addEventListener('click', exportDuty);
+        document.getElementById('duty-clear').addEventListener('click', clearDuty);
+
+        document.getElementById('duty-week').addEventListener('change', function(){
+          renderDuty();
+        });
+        document.getElementById('duty-search').addEventListener('input', renderDutyCounts);
+
+        document.getElementById('duty-body').addEventListener('click', function(e){
+          var td = e.target.closest ? e.target.closest('td[data-day]') : null;
+          if(td) openDutyPicker(td);
+        });
+
+        document.addEventListener('click', function(e){
+          var box = document.querySelector('.duty-picker');
+          if(!box) return;
+          if(!box.contains(e.target) && !(e.target.closest && e.target.closest('td[data-day]'))) {
+            closeDutyPicker();
+          }
+        });
+
+        document.addEventListener('keydown', function(e){
+          if(e.key === 'Escape') closeDutyPicker();
+        });
+      }
+
       window.__synutv = {
         switchView: switchView,
         loadAccounts: loadAccounts,
@@ -3141,7 +3689,12 @@
         openSpecialModal: openSpecialModal,
         closeSpecialModal: closeSpecialModal,
         renderSpecialList: renderSpecialList,
-        updateAddButton: updateAddButton
+        updateAddButton: updateAddButton,
+        // 排值班表（自检用）
+        loadDuty: loadDuty,
+        generateDuty: generateDuty,
+        renderDuty: renderDuty,
+        dutyState: dutyState
       };
     })();
   </script>

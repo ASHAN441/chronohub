@@ -55,7 +55,12 @@ a = Analysis(
     [os.path.join(ROOT, "run.py")],
     pathex=[ROOT],
     binaries=[],
-    datas=[(os.path.join(ROOT, "web"), "web")],
+    datas=[
+        (os.path.join(ROOT, "web"), "web"),
+        # 值班表导出模板。用户也可以把同名文件放在 exe 同级来替换它
+        # （见 app/docx_export.template_path 的查找顺序）。
+        (os.path.join(ROOT, "值班表.docx"), "."),
+    ],
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},

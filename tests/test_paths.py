@@ -92,6 +92,17 @@ class ResourceLayoutTest(unittest.TestCase):
         self.assertIn('"web"', content, "spec 必须把 web/ 作为数据一起打包")
         self.assertIn("console=False", content, "窗口程序不应留控制台")
 
+    def test_spec_bundles_duty_template(self):
+        """值班表导出模板必须打进包里，否则打包后一点「导出」就报找不到模板。"""
+        spec = os.path.join(ROOT, "packaging", "KongKeBiaoPRO.spec")
+        with open(spec, encoding="utf-8") as handle:
+            content = handle.read()
+        self.assertIn("值班表.docx", content, "spec 必须把值班表模板一起打包")
+        self.assertTrue(
+            os.path.exists(os.path.join(ROOT, "值班表.docx")),
+            "仓库根目录应有值班表.docx 模板",
+        )
+
 
 class DataPathConsumersTest(unittest.TestCase):
     """所有**可写**路径都必须派生自 paths.data_dir()。

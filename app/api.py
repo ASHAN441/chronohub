@@ -1,3 +1,4 @@
+import json
 import tkinter as tk
 import os
 import threading
@@ -6,6 +7,17 @@ from tkinter import filedialog
 from .account_service import AccountService
 from .clipboard import set_text_temporary
 from .config import app_info
+from .docx_export import export_roster, template_path
+from .duty_scheduler import generate_roster, swap_candidates
+from .duty_store import (
+    DUTY_FILE,
+    count_assignments,
+    load_rosters,
+    normalize_roster,
+    person_key as duty_person_key,
+    save_rosters,
+    upsert_roster,
+)
 from .parser import PARSER_VERSION, parse_pdf
 from .paths import base_dir
 from .people_store import (
@@ -36,6 +48,7 @@ class Api:
         groups_path: str = None,
         accounts_db_path: str = None,
         specials_path: str = None,
+        duty_path: str = None,
     ):
         self._window = None
         self._qt_app = None
@@ -43,8 +56,8 @@ class Api:
         self._browser = None
         self.data_path = data_path or DATA_FILE
         self.groups_path = groups_path or GROUPS_FILE
-        # specials 默认跟 people 放在同一个目录：这样注入 data_path 的测试/自定义
-        # 数据目录会自动隔离，不会去读写真实的 data/specials.json。
+        # specials / duty 默认跟 people 放在同一个目录：这样注入 data_path 的测试
+        # 和自定义数据目录会自动隔离，不会去读写真实数据。
         if specials_path:
             self.specials_path = specials_path
         elif data_path:
@@ -53,9 +66,20 @@ class Api:
             )
         else:
             self.specials_path = SPECIALS_FILE
+
+        if duty_path:
+            self.duty_path = duty_path
+        elif data_path:
+            self.duty_path = os.path.join(
+                os.path.dirname(os.path.abspath(data_path)), "duty.json"
+            )
+        else:
+            self.duty_path = DUTY_FILE
+
         self.people, self.parser_version = load_data(self.data_path)
         self.groups = load_groups(self.groups_path)
         self.specials = load_specials(self.specials_path)
+        self.rosters = load_rosters(self.duty_path)
         self._lock = threading.Lock()
         # 人员数据的读写锁。为什么必须有：批量导入跑在后台线程，而
         # 「导出课表 → 自动入库」走 js_api 子线程，两者可能同时 _merge 并写同一个
@@ -463,6 +487,225 @@ class Api:
                 save_specials(self.specials, self.specials_path)
             snapshot = [dict(item) for item in self.specials]
         return {"ok": True, "specials": snapshot}
+
+    # ================= 值班表 =================
+    #
+    # 按周存：一张表 = 某一周的全部班次。重新生成同一周会覆盖。
+    # 「值了几次班」= 所有已存值班表的汇总，永远和实际排班一致。
+
+    def get_duty(self) -> dict:
+        with self._people_lock:
+            rosters = [json.loads(json.dumps(r)) for r in self.rosters]
+            people = [p.to_dict() for p in self.people]
+
+        names = {}
+        group_of = {}
+        for person in people:
+            key = duty_person_key(person)
+            if key:
+                names[key] = person.get("name") or key
+                group_of[key] = person.get("group") or ""
+
+        return {
+            "rosters": rosters,
+            "counts": count_assignments(rosters),
+            "names": names,
+            "groups": group_of,
+            "group_names": sorted({g for g in group_of.values() if g}),
+            "has_template": bool(template_path()),
+        }
+
+    def generate_duty(self, week, groups) -> dict:
+        try:
+            week = int(week)
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "周次不合法"}
+
+        with self._people_lock:
+            people = [p.to_dict() for p in self.people]
+            specials = [dict(s) for s in self.specials]
+            existing = [json.loads(json.dumps(r)) for r in self.rosters]
+
+        if not people:
+            return {"ok": False, "error": "还没有导入课表，无法排班"}
+
+        # 排除当前这一周的历史计数：重排同一周时不该让已排的人轮空
+        totals = count_assignments(existing, exclude_week=week)
+        assignments, _ = generate_roster(people, specials, week, groups or {}, totals)
+
+        roster = normalize_roster({
+            "week": week,
+            "groups": groups or {},
+            "assignments": assignments,
+        })
+        if roster is None:
+            return {"ok": False, "error": "排班结果为空"}
+
+        with self._people_lock:
+            self.rosters = upsert_roster(self.rosters, roster)
+            save_rosters(self.rosters, self.duty_path)
+
+        payload = self.get_duty()
+        payload["ok"] = True
+        payload["week"] = week
+        return payload
+
+    def duty_candidates(self, week, day, block, role) -> dict:
+        """某班次当前可换的人（当时有空 + 本周未排）。"""
+        try:
+            week, day, block = int(week), int(day), int(block)
+        except (TypeError, ValueError):
+            return {"candidates": []}
+
+        roster = None
+        with self._people_lock:
+            for item in self.rosters:
+                if item["week"] == week:
+                    roster = json.loads(json.dumps(item))
+                    break
+            people = [p.to_dict() for p in self.people]
+            specials = [dict(s) for s in self.specials]
+
+        if roster is None:
+            return {"candidates": []}
+
+        used = set()
+        for item in roster["assignments"]:
+            if item["kind"] == "dual":
+                used.update(k for k in (item.get("minister"), item.get("hall")) if k)
+            else:
+                used.add(item.get("person") or "")
+
+        slot = None
+        for item in roster["assignments"]:
+            if item["day"] == day and item["block"] == block:
+                slot = item
+                break
+        if slot is None:
+            return {"candidates": []}
+
+        keys = swap_candidates(
+            people, specials, week, roster.get("groups") or {},
+            role, slot["day"], slot["start"], slot["end"], used,
+        )
+        names = {}
+        for person in people:
+            key = duty_person_key(person)
+            if key:
+                names[key] = person.get("name") or key
+        return {"candidates": [{"key": k, "name": names.get(k, k)} for k in keys]}
+
+    def swap_duty(self, week, day, block, role, person_key) -> dict:
+        try:
+            week, day, block = int(week), int(day), int(block)
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "参数不合法"}
+
+        person_key = str(person_key or "").strip()
+        if not person_key:
+            return {"ok": False, "error": "没有选择替换的人"}
+
+        with self._people_lock:
+            index = None
+            for i, item in enumerate(self.rosters):
+                if item["week"] == week:
+                    index = i
+                    break
+            if index is None:
+                return {"ok": False, "error": "这一周还没有排班"}
+
+            roster = json.loads(json.dumps(self.rosters[index]))
+            slot = None
+            for item in roster["assignments"]:
+                if item["day"] == day and item["block"] == block:
+                    slot = item
+                    break
+            if slot is None:
+                return {"ok": False, "error": "没找到这个班次"}
+
+            field = "hall" if role == "hall" else ("minister" if slot["kind"] == "dual" else "person")
+            slot[field] = person_key
+            roster["assignments"] = [
+                item for item in roster["assignments"]
+                if item["day"] != day or item["block"] != block
+            ] + [slot]
+
+            self.rosters[index] = roster
+            save_rosters(self.rosters, self.duty_path)
+
+        payload = self.get_duty()
+        payload["ok"] = True
+        payload["week"] = week
+        return payload
+
+    def clear_duty(self, week) -> dict:
+        """删掉某一周排班（次数会随之回落）。"""
+        try:
+            week = int(week)
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "周次不合法"}
+        with self._people_lock:
+            self.rosters = [r for r in self.rosters if r["week"] != week]
+            save_rosters(self.rosters, self.duty_path)
+        payload = self.get_duty()
+        payload["ok"] = True
+        return payload
+
+    def export_duty(self, week, out_path=None) -> dict:
+        """按模板导出某一周的值班表。不传路径则弹保存对话框。"""
+        try:
+            week = int(week)
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "周次不合法"}
+
+        target = out_path
+        if not target:
+            root = tk.Tk()
+            root.withdraw()
+            try:
+                root.attributes("-topmost", True)
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                target = filedialog.asksaveasfilename(
+                    title="导出值班表",
+                    defaultextension=".docx",
+                    initialfile=f"第{week}周值班表.docx",
+                    filetypes=[("Word 文档", "*.docx")],
+                )
+            finally:
+                try:
+                    root.destroy()
+                except Exception:  # noqa: BLE001
+                    pass
+            if not target:
+                return {"ok": False, "error": "已取消"}
+
+        with self._people_lock:
+            roster = None
+            for item in self.rosters:
+                if item["week"] == week:
+                    roster = json.loads(json.dumps(item))
+                    break
+            people = [p.to_dict() for p in self.people]
+
+        if roster is None:
+            return {"ok": False, "error": "这一周还没有排班"}
+
+        names = {}
+        for person in people:
+            key = duty_person_key(person)
+            if key:
+                names[key] = person.get("name") or key
+
+        try:
+            saved = export_roster(roster, names, out_path)
+        except FileNotFoundError as exc:
+            return {"ok": False, "error": str(exc)}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": f"导出失败：{exc}"}
+
+        return {"ok": True, "path": saved}
 
     @staticmethod
     def _same_person(existing, person) -> bool:

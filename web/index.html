@@ -631,7 +631,7 @@
       <section class="view" id="view-about">
         <div class="about-view">
           <div class="about-box">
-            <div class="about-big-logo">空</div>
+            <div class="about-big-logo">时</div>
             <div class="about-big-name" id="about-big-name">时枢 ChronoHub</div>
             <div class="about-big-version" id="about-big-version">v3.3.2</div>
             <div class="about-note" id="about-note"></div>
@@ -1154,8 +1154,8 @@
             '<div class="grid-empty-sub">选择教务系统导出的 PDF 文件，开始统计多人空课表。</div>' +
             '<button class="tb-btn primary" type="button" data-action="empty-import">导入课表</button>' +
             '</td></tr>';
-          document.getElementById('status-summary').textContent = '暂无人员';
-          document.getElementById('status-week').textContent = '';
+          // 左侧固定显示软件名，提示信息统一放右侧
+          document.getElementById('status-week').textContent = '暂无人员';
           return;
         }
         legend.hidden = false;
@@ -1188,11 +1188,12 @@
       }
 
       function updateStatus(){
-        // 合并后：仅当「空课表」视图激活时才写状态栏，避免覆盖其他视图的提示
+        // 左侧固定是软件名，这里只写右侧的统计信息
         if(currentView() !== 'freetime') return;
+        var right = document.getElementById('status-week');
         var sel = selectedList();
         if(sel.length===0){
-          document.getElementById('status-summary').textContent = '请至少选择一人';
+          right.textContent = '请至少选择一人';
           return;
         }
         var weekLabel = state.week==='all' ? '全程有空' : '第'+state.week+'周';
@@ -1206,15 +1207,16 @@
             bestSlots.push(DAYS[d-1]+' 第'+p+'节');
           }
         }
+        var summary;
         if(bestCount > 0){
           var shown = bestSlots.slice(0,3).join('、');
           if(bestSlots.length>3) shown += ' 等';
-          document.getElementById('status-summary').innerHTML = '空闲人数最多 <strong>'+bestCount+'</strong> 人（'+shown+'）';
+          summary = '空闲人数最多 ' + bestCount + ' 人（' + shown + '）';
         } else {
           // 每个时段都有人有课：不能输出「空闲人数最多 0 人（）」
-          document.getElementById('status-summary').textContent = '当前条件下没有空闲时段';
+          summary = '当前条件下没有空闲时段';
         }
-        document.getElementById('status-week').textContent = weekLabel+' · 已选 '+sel.length+' 人';
+        right.textContent = summary + ' · ' + weekLabel + ' · 已选 ' + sel.length + ' 人';
       }
 
       var rosterSlot = null;
@@ -2595,15 +2597,20 @@
         var view = currentView();
         var left = document.getElementById('status-summary');
         var right = document.getElementById('status-week');
+
+        // 所有视图最下方统一显示软件名（用户要求：不要各页各写一句话）
+        left.textContent = DEFAULT_APP_INFO.name || '时枢 ChronoHub';
+
         if(view === 'accounts'){
-          left.textContent = '账号存在本地 data/accounts.db，密码经 Windows DPAPI 加密';
           right.textContent = '共 ' + acctState.accounts.length + ' 个账号';
         } else if(view === 'browser'){
-          left.textContent = '内嵌 Chromium 内核（QtWebEngine）· 自动登录与导出都在应用窗口内完成';
           right.textContent = browserState.loggedName ? ('已登录：' + browserState.loggedName) : '未登录';
         } else if(view === 'about'){
-          left.textContent = '时枢 ChronoHub · 由「教务系统管理器」与「多人空课表」合并';
           right.textContent = 'v' + (DEFAULT_APP_INFO.version || '');
+        } else if(view === 'duty'){
+          // 值班表页自己不写状态栏，必须显式清空，
+          // 否则会残留上一个视图的文字（比如从课表导出切过来会显示「未登录」）
+          right.textContent = '';
         } else {
           updateStatus();
         }

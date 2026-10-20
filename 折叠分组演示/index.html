@@ -419,6 +419,27 @@
   border-color:var(--win-border);
 }
 
+/* 侧边栏标题：原来 12px/600，和下面的说明文字几乎一个分量，改成明显的标题 */
+.win-sidebar-title{ font-size:13px; font-weight:600; color:var(--win-text); letter-spacing:.2px; }
+
+/* 人员删除：尺寸收小、默认无底色，只在鼠标经过这一行时才浮出底色 */
+.person-del{
+  width:18px; height:18px;
+  background:transparent;
+  border-color:transparent;
+  transition:background .13s ease, color .13s ease, border-color .13s ease;
+}
+.person-item:hover .person-del{
+  background:var(--win-surface-3);
+  border-color:var(--win-border);
+}
+.person-del:hover{
+  background:color-mix(in srgb, #e81123 12%, var(--win-surface));
+  border-color:color-mix(in srgb, #e81123 45%, var(--win-border));
+  color:#e81123;
+}
+.person-del svg{ width:10px; height:10px; }
+
 /* 侧边栏里另外两个按钮也并进这套：
    新建分组（带文字的）、人员行的删除 —— 同样是 surface-3 底 + 1px 边 + 5px 圆角 + SVG 图标 */
 .win-sidebar-head .tb-btn{
@@ -479,7 +500,7 @@
 
 <div class="demo-bar">
   <b>界面演示</b>
-  <span>点分组名左边的小箭头可以收起这个组（搜索时会自动展开）。</span>
+  <span>点分组名左边的小箭头可以收起这个组，<b>收起状态会自动记住</b>（搜索时自动展开）。</span>
 </div>
 
 <div class="win-titlebar">
@@ -608,8 +629,25 @@
     }
   });
 
-  /* ---------- 折叠状态 ---------- */
-  var collapsed = {};        // 组名 -> true
+  /* ---------- 折叠状态（记住：下次打开还是上次的样子） ---------- */
+  var STORAGE_KEY = 'synutv.sidebar.collapsed';
+  var collapsed = {};
+
+  function loadCollapsed(){
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return {};
+      var obj = JSON.parse(raw);
+      return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+    } catch(e) {
+      return {};   // localStorage 不可用 / 内容损坏都不该影响打开
+    }
+  }
+
+  function saveCollapsed(){
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(collapsed)); } catch(e) {}
+  }
+
   var search = '';
 
   function esc(s){
@@ -738,6 +776,7 @@
       if(toggle.disabled) return;
       var group = toggle.getAttribute('data-toggle');
       collapsed[group] = !collapsed[group];
+      saveCollapsed();
       // 只切类名，不重绘整个列表：箭头有旋转过渡，列表也不会闪一下
       var block = toggle.closest('.group-block');
       if(block) block.classList.toggle('is-collapsed', collapsed[group]);
@@ -759,6 +798,7 @@
   document.getElementById('collapse-all').addEventListener('click', function(){
     var anyOpen = GROUPS.some(function(g){ return !collapsed[g]; });
     GROUPS.forEach(function(g){ collapsed[g] = anyOpen; });
+    saveCollapsed();
     renderSidebar();
   });
 
@@ -767,6 +807,7 @@
     renderSidebar();
   });
 
+  collapsed = loadCollapsed();
   renderGrid();
   renderSidebar();
 })();

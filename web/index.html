@@ -407,9 +407,43 @@
       font-size:10px; line-height:1; padding:0; }
     .duty-adjust-undo:hover{ color:#c42b1c; }
     .duty-chip[data-key]{ cursor:pointer; }
+    /* ===== 开屏（v3.3.2 新增） ===== */
+    .splash{ position:fixed; inset:0; z-index:9000; background:#000;
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:26px; }
+    .splash-logo{ width:184px; height:auto; display:block; opacity:0; transform:scale(.92); }
+    .splash-line{ display:flex; align-items:baseline; gap:16px; }
+    .splash-w{ color:#fff; font-size:30px; font-weight:600; letter-spacing:.18em;
+      margin-right:-.18em; opacity:0; transform:translateY(10px); }
+    .splash-rule{ width:0; height:1px; background:rgba(255,255,255,.38); }
+
+    .splash.go .splash-logo{ animation:spLogo .70s cubic-bezier(.2,.8,.2,1) .10s both; }
+    .splash.go .splash-w:nth-child(1){ animation:spWord .82s cubic-bezier(.2,.8,.2,1) .40s both; }
+    .splash.go .splash-w:nth-child(2){ animation:spWord .82s cubic-bezier(.2,.8,.2,1) .62s both; }
+    .splash.go .splash-w:nth-child(3){ animation:spWord .82s cubic-bezier(.2,.8,.2,1) .84s both; }
+    .splash.go .splash-rule{ animation:spRule .95s cubic-bezier(.2,.8,.2,1) 1.10s both; }
+    .splash.out{ animation:spOut .78s cubic-bezier(.4,0,.6,1) both; }
+
+    @keyframes spLogo{ from{ opacity:0; transform:scale(.92); } to{ opacity:1; transform:scale(1); } }
+    @keyframes spWord{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:translateY(0); } }
+    @keyframes spRule{ from{ width:0; } to{ width:96px; } }
+    @keyframes spOut{ from{ opacity:1; transform:scale(1); } to{ opacity:0; transform:scale(1.035); } }
+
+    @media (prefers-reduced-motion: reduce){
+      .splash.go .splash-logo, .splash.go .splash-w, .splash.go .splash-rule, .splash.out{
+        animation-duration:.01ms !important; }
+    }
   </style>
 </head>
 <body>
+
+  <!-- 开屏：数据就绪前盖住界面。退出由加载完成触发，不是定时器 -->
+  <div class="splash" id="splash" aria-hidden="true">
+    <img class="splash-logo" src="assets/logo-dark.png" alt="">
+    <div class="splash-line">
+      <span class="splash-w">ALL</span><span class="splash-w">FOR</span><span class="splash-w">SYNUTV</span>
+    </div>
+    <div class="splash-rule"></div>
+  </div>
   <div class="win-titlebar">
     <div class="win-titlebar-left">
       <span class="win-logo">时</span>
@@ -3083,6 +3117,38 @@
         document.getElementById('goto-freetime').addEventListener('click', function(){ switchView('freetime'); });
       }
 
+      /* ---------- 开屏：退场由「数据就绪」触发，不是定时器 ----------
+         两个时间常量：
+         - ENTER：入场总时长。数据往往 0.5 秒就好了，若立刻退场会把动画切一半，
+           所以至少要播完入场再走。
+         - MAX：兜底。万一加载卡住（接口异常、数据坏了），不能永远挡着界面。 */
+      var SPLASH_ENTER_MS = 2100;
+      var SPLASH_MAX_MS = 9000;
+      var splashT0 = Date.now();
+      var splashGone = false;
+
+      function finishSplash(){
+        if(splashGone) return;
+        splashGone = true;
+        var el = document.getElementById('splash');
+        if(!el) return;
+        el.classList.add('out');
+        setTimeout(function(){
+          if(el.parentNode) el.parentNode.removeChild(el);
+        }, 820);
+      }
+
+      function splashReady(){
+        var used = Date.now() - splashT0;
+        setTimeout(finishSplash, Math.max(0, SPLASH_ENTER_MS - used));
+      }
+
+      (function startSplash(){
+        var el = document.getElementById('splash');
+        if(el) el.classList.add('go');
+        setTimeout(finishSplash, SPLASH_MAX_MS);   // 兜底
+      })();
+
       populateWeekSelect();
       loadAppInfo();
       bindRailNav();
@@ -3105,6 +3171,7 @@
         renderAll();
         updateAddButton();
         refreshIfNeeded();
+        splashReady();          // 数据到位，可以收起开屏了
       });
 
       // 自动化自检用的钩子：本文件所有函数都在 IIFE 内，外部（含 WebView

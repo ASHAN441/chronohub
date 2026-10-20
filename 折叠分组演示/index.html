@@ -389,15 +389,28 @@
 
 /* ============ 本次新增：分组折叠 ============ */
 /* 分组头改成 flex，让折叠箭头、组名、工具按钮能排在一行 */
-.group-header{ display:flex; align-items:center; gap:3px; }
+.group-header{ display:flex; align-items:center; gap:2px; }
+
+/* 折叠箭头：跟界面其他图标一致 —— 线性 SVG，不是 ▸ 这种字符 */
 .group-toggle{
-  flex:none; width:16px; height:16px; padding:0; border:none; background:transparent;
-  color:var(--win-text-muted); cursor:pointer; font-size:10px; line-height:1;
-  display:flex; align-items:center; justify-content:center; border-radius:3px;
+  flex:none; width:20px; height:20px; margin-left:-3px; padding:0;
+  border:none; background:transparent; color:var(--win-text-muted); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; border-radius:4px;
+}
+.group-toggle svg{
+  width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2.2;
+  stroke-linecap:round; stroke-linejoin:round; transition:transform .16s ease;
 }
 .group-toggle:hover{ background:var(--win-surface-3); color:var(--win-text); }
-.group-block.is-collapsed .group-name{ opacity:.75; }
+.group-toggle:disabled{ opacity:.32; cursor:default; }
+.group-toggle:disabled:hover{ background:transparent; color:var(--win-text-muted); }
+
+/* 收起时箭头转 -90°，列表直接隐藏；只切类名所以有过渡、不闪 */
+.group-block.is-collapsed .group-toggle svg{ transform:rotate(-90deg); }
+.group-block.is-collapsed .group-name{ opacity:.8; }
 .group-block.is-collapsed .group-header{ padding-bottom:6px; }
+.group-body{ display:block; }
+.group-block.is-collapsed .group-body{ display:none; }
 
 .sidebar-tools{ display:flex; align-items:center; gap:6px; padding:0 6px 8px; }
 .sidebar-tools .tb-btn{ height:24px; padding:0 8px; font-size:11.5px; }
@@ -423,7 +436,7 @@
 
 <div class="demo-bar">
   <b>界面演示</b>
-  <span>点分组名左边的 ▾ 可以收起这个组；搜索时自动展开。</span>
+  <span>点分组名左边的小箭头可以收起这个组（搜索时会自动展开）。</span>
 </div>
 
 <div class="win-titlebar">
@@ -591,7 +604,9 @@
 
       html += '<div class="group-header">';
       html += '<button class="group-toggle" type="button" data-toggle="' + esc(group) +
-              '" title="' + (isCollapsed ? '展开' : '收起') + '">' + (isCollapsed ? '▸' : '▾') + '</button>';
+              '" title="' + (keyword ? '搜索时自动展开' : (isCollapsed ? '展开' : '收起')) + '"' +
+              (keyword ? ' disabled' : '') + '>' +
+              '<svg viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></svg></button>';
       html += '<span class="group-name group-name-edit" title="点击编辑分组名称（原功能不变）">' +
               esc(group) + ' · ' + shown.length + ' 人</span>';
       html += '<span class="group-tools">';
@@ -602,20 +617,21 @@
       html += '</span>';
       html += '</div>';
 
-      if(!isCollapsed){
-        shown.forEach(function(p, i){
-          html += '<label class="person-item' + (p.selected ? '' : ' is-off') + '">' +
-            '<input type="checkbox" class="person-check"' + (p.selected ? ' checked' : '') + '>' +
-            '<span class="person-avatar">' + esc(p.name.charAt(0)) + '</span>' +
-            '<span class="person-info"><span class="person-name">' + esc(p.name) + '</span>' +
-            '<span class="person-major">' + esc(p.student_id) + '</span></span>' +
-            '<button class="person-del" type="button" title="删除该人员">×</button>' +
-          '</label>';
-        });
-        if(!shown.length){
-          html += '<div class="group-empty">拖到这里</div>';
-        }
+      // 人员行包一层 group-body：收起时整块 display:none，不用重建 DOM
+      html += '<div class="group-body">';
+      shown.forEach(function(p, i){
+        html += '<label class="person-item' + (p.selected ? '' : ' is-off') + '">' +
+          '<input type="checkbox" class="person-check"' + (p.selected ? ' checked' : '') + '>' +
+          '<span class="person-avatar">' + esc(p.name.charAt(0)) + '</span>' +
+          '<span class="person-info"><span class="person-name">' + esc(p.name) + '</span>' +
+          '<span class="person-major">' + esc(p.student_id) + '</span></span>' +
+          '<button class="person-del" type="button" title="删除该人员">×</button>' +
+        '</label>';
+      });
+      if(!shown.length){
+        html += '<div class="group-empty">拖到这里</div>';
       }
+      html += '</div>';
 
       html += '</div>';
     });
@@ -672,9 +688,14 @@
     var toggle = e.target.closest ? e.target.closest('[data-toggle]') : null;
     if(toggle){
       e.preventDefault();
+      if(toggle.disabled) return;
       var group = toggle.getAttribute('data-toggle');
       collapsed[group] = !collapsed[group];
-      renderSidebar();
+      // 只切类名，不重绘整个列表：箭头有旋转过渡，列表也不会闪一下
+      var block = toggle.closest('.group-block');
+      if(block) block.classList.toggle('is-collapsed', collapsed[group]);
+      toggle.title = collapsed[group] ? '展开' : '收起';
+      updateTools();
       return;
     }
     var check = e.target.closest ? e.target.closest('.person-check') : null;

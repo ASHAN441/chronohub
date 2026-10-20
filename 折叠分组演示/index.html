@@ -419,6 +419,30 @@
   border-color:var(--win-border);
 }
 
+/* 侧边栏里另外两个按钮也并进这套：
+   新建分组（带文字的）、人员行的删除 —— 同样是 surface-3 底 + 1px 边 + 5px 圆角 + SVG 图标 */
+.win-sidebar-head .tb-btn{
+  background:var(--win-surface-3);
+  border:1px solid var(--win-border);
+  color:var(--win-text);
+  border-radius:5px;
+  gap:5px;
+  transition:background .13s ease, border-color .13s ease;
+}
+.win-sidebar-head .tb-btn:hover{
+  background:color-mix(in srgb, var(--win-text) 13%, var(--win-surface));
+  border-color:color-mix(in srgb, var(--win-text) 24%, var(--win-border));
+}
+.win-sidebar-head .tb-btn svg,
+.person-del svg{
+  width:11px; height:11px; flex:none; fill:none; stroke:currentColor; stroke-width:2.2;
+  stroke-linecap:round; stroke-linejoin:round;
+}
+.person-del{
+  background:var(--win-surface-3);
+  transition:background .13s ease, color .13s ease, border-color .13s ease;
+}
+
 /* 只有折叠箭头会旋转 */
 .group-toggle{ margin-left:-3px; }
 .group-toggle svg{ transition:transform .16s ease; }
@@ -517,7 +541,7 @@
         <aside class="win-sidebar">
           <div class="win-sidebar-head">
             <span class="win-sidebar-title">人员分组</span>
-            <button class="tb-btn" type="button">＋ 新建分组</button>
+            <button class="tb-btn" type="button"><svg viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></svg>新建分组</button>
           </div>
           <div class="win-sidebar-search">
             <input class="win-input" id="people-search" placeholder="搜索姓名/学号">
@@ -647,7 +671,8 @@
           '<span class="person-avatar">' + esc(p.name.charAt(0)) + '</span>' +
           '<span class="person-info"><span class="person-name">' + esc(p.name) + '</span>' +
           '<span class="person-major">' + esc(p.student_id) + '</span></span>' +
-          '<button class="person-del" type="button" title="删除该人员">×</button>' +
+          '<button class="person-del" type="button" title="删除该人员">' +
+            '<svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg></button>' +
         '</label>';
       });
       if(!shown.length){

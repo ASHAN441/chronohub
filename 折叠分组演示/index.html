@@ -391,19 +391,38 @@
 /* 分组头改成 flex，让折叠箭头、组名、工具按钮能排在一行 */
 .group-header{ display:flex; align-items:center; gap:2px; }
 
-/* 折叠箭头：跟界面其他图标一致 —— 线性 SVG，不是 ▸ 这种字符 */
-.group-toggle{
-  flex:none; width:20px; height:20px; margin-left:-3px; padding:0;
-  border:none; background:transparent; color:var(--win-text-muted); cursor:pointer;
-  display:flex; align-items:center; justify-content:center; border-radius:4px;
+/* 折叠箭头 + 上移/下移/删除：统一成同一套小图标按钮 */
+.group-tool{
+  flex:none; width:20px; height:20px; padding:0;
+  border:1px solid var(--win-border);
+  background:var(--win-surface-3);              /* 比原来的 surface-2 深一档 */
+  color:var(--win-text-muted);
+  border-radius:5px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .13s ease, color .13s ease, border-color .13s ease;
 }
-.group-toggle svg{
-  width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2.2;
-  stroke-linecap:round; stroke-linejoin:round; transition:transform .16s ease;
+.group-tool svg{
+  width:11px; height:11px; fill:none; stroke:currentColor; stroke-width:2.2;
+  stroke-linecap:round; stroke-linejoin:round;
 }
-.group-toggle:hover{ background:var(--win-surface-3); color:var(--win-text); }
-.group-toggle:disabled{ opacity:.32; cursor:default; }
-.group-toggle:disabled:hover{ background:transparent; color:var(--win-text-muted); }
+.group-tool:hover{
+  background:color-mix(in srgb, var(--win-text) 13%, var(--win-surface));
+  color:var(--win-text);
+  border-color:color-mix(in srgb, var(--win-text) 24%, var(--win-border));
+}
+.group-tool:active{
+  background:color-mix(in srgb, var(--win-text) 19%, var(--win-surface));
+}
+.group-tool:disabled{ opacity:.38; cursor:default; }
+.group-tool:disabled:hover{
+  background:var(--win-surface-3); color:var(--win-text-muted);
+  border-color:var(--win-border);
+}
+
+/* 只有折叠箭头会旋转 */
+.group-toggle{ margin-left:-3px; }
+.group-toggle svg{ transition:transform .16s ease; }
+.group-block.is-collapsed .group-toggle svg{ transform:rotate(-90deg); }
 
 /* 收起时箭头转 -90°，列表直接隐藏；只切类名所以有过渡、不闪 */
 .group-block.is-collapsed .group-toggle svg{ transform:rotate(-90deg); }
@@ -603,7 +622,7 @@
               '" data-group="' + esc(group) + '">';
 
       html += '<div class="group-header">';
-      html += '<button class="group-toggle" type="button" data-toggle="' + esc(group) +
+      html += '<button class="group-tool group-toggle" type="button" data-toggle="' + esc(group) +
               '" title="' + (keyword ? '搜索时自动展开' : (isCollapsed ? '展开' : '收起')) + '"' +
               (keyword ? ' disabled' : '') + '>' +
               '<svg viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></svg></button>';
@@ -611,9 +630,12 @@
               esc(group) + ' · ' + shown.length + ' 人</span>';
       html += '<span class="group-tools">';
       html += '<input type="checkbox" class="group-check" title="全选 / 取消本组人员" checked>';
-      html += '<button class="group-btn" type="button" title="上移">▲</button>';
-      html += '<button class="group-btn" type="button" title="下移">▼</button>';
-      html += '<button class="group-btn" type="button" title="删除分组">×</button>';
+      html += '<button class="group-tool" type="button" title="上移">' +
+              '<svg viewBox="0 0 24 24"><path d="M6 14.5l6-6 6 6"/></svg></button>';
+      html += '<button class="group-tool" type="button" title="下移">' +
+              '<svg viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></svg></button>';
+      html += '<button class="group-tool" type="button" title="删除分组">' +
+              '<svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg></button>';
       html += '</span>';
       html += '</div>';
 

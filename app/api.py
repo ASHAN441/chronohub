@@ -2,6 +2,9 @@ import json
 import tkinter as tk
 import os
 import threading
+import traceback
+from datetime import datetime
+from pathlib import Path
 from tkinter import filedialog
 
 from .account_service import AccountService
@@ -19,7 +22,7 @@ from .duty_store import (
     upsert_roster,
 )
 from .parser import PARSER_VERSION, parse_pdf
-from .paths import base_dir
+from .paths import base_dir, sub_dir
 from .people_store import (
     DATA_FILE,
     GROUPS_FILE,
@@ -37,6 +40,17 @@ from .specials_store import (
     save_specials,
 )
 from .system_urls import DEFAULT_LOGIN_URL, SYSTEM_URLS
+
+
+def _default_save_dir() -> str:
+    """保存对话框的默认目录：桌面优先，其次用户主目录。
+
+    不指定的话，从快捷方式启动时对话框可能落在 C:\\Windows\\System32 这类
+    不可写的地方，用户随手一存就撞权限错误。
+    """
+    home = os.path.expanduser("~")
+    desktop = os.path.join(home, "Desktop")
+    return desktop if os.path.isdir(desktop) else home
 
 
 class Api:
@@ -75,6 +89,14 @@ class Api:
             )
         else:
             self.duty_path = DUTY_FILE
+
+        # 导出的兜底目录：跟数据放一起，注入 data_path 时自动隔离
+        if data_path:
+            self.exports_dir = os.path.join(
+                os.path.dirname(os.path.abspath(data_path)), "exports"
+            )
+        else:
+            self.exports_dir = sub_dir("exports")
 
         self.people, self.parser_version = load_data(self.data_path)
         self.groups = load_groups(self.groups_path)
@@ -651,35 +673,57 @@ class Api:
         payload["ok"] = True
         return payload
 
+    def _log_export_error(self, note: str) -> None:
+        """把导出失败的原因落到 data/logs/export-error.log。
+
+        打包后没有控制台，弹窗里只显示一行字；把完整堆栈写下来才能查。
+        """
+        try:
+            logs = Path(sub_dir("logs"))
+            stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            with open(logs / "export-error.log", "a", encoding="utf-8") as handle:
+                handle.write(f"\n[{stamp}] {note}\n")
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _ask_save_path(self, week: int) -> str:
+        """弹保存对话框；用户取消返回空串。
+
+        对话框本身出问题是允许抛的，由调用方决定退回哪里——不能因为
+        「挑不了保存位置」就整个导出失败。
+        """
+        root = tk.Tk()
+        root.withdraw()
+        try:
+            root.attributes("-topmost", True)
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            return filedialog.asksaveasfilename(
+                title="导出值班表",
+                defaultextension=".docx",
+                initialfile=f"第{week}周值班表.docx",
+                initialdir=_default_save_dir(),
+                filetypes=[("Word 文档", "*.docx")],
+            ) or ""
+        finally:
+            try:
+                root.destroy()
+            except Exception:  # noqa: BLE001
+                pass
+
     def export_duty(self, week, out_path=None) -> dict:
-        """按模板导出某一周的值班表。不传路径则弹保存对话框。"""
+        """按模板导出某一周的值班表。
+
+        三种情况都不该让用户"点了没下文"：
+        - 不传路径：弹保存对话框，用户自选位置
+        - 对话框打不开 / 选的目录不可写：退回 data/exports/，并告知原因
+        - 用户取消：明确返回「已取消」
+        """
         try:
             week = int(week)
         except (TypeError, ValueError):
             return {"ok": False, "error": "周次不合法"}
-
-        target = out_path
-        if not target:
-            root = tk.Tk()
-            root.withdraw()
-            try:
-                root.attributes("-topmost", True)
-            except Exception:  # noqa: BLE001
-                pass
-            try:
-                target = filedialog.asksaveasfilename(
-                    title="导出值班表",
-                    defaultextension=".docx",
-                    initialfile=f"第{week}周值班表.docx",
-                    filetypes=[("Word 文档", "*.docx")],
-                )
-            finally:
-                try:
-                    root.destroy()
-                except Exception:  # noqa: BLE001
-                    pass
-            if not target:
-                return {"ok": False, "error": "已取消"}
 
         with self._people_lock:
             roster = None
@@ -690,7 +734,7 @@ class Api:
             people = [p.to_dict() for p in self.people]
 
         if roster is None:
-            return {"ok": False, "error": "这一周还没有排班"}
+            return {"ok": False, "error": f"第 {week} 周还没有排班"}
 
         names = {}
         for person in people:
@@ -698,14 +742,54 @@ class Api:
             if key:
                 names[key] = person.get("name") or key
 
+        fallback_note = ""
+        target = out_path
+
+        if not target:
+            try:
+                target = self._ask_save_path(week)
+            except Exception as exc:  # noqa: BLE001
+                self._log_export_error(f"保存对话框打不开：{exc!r}\n{traceback.format_exc()}")
+                fallback_note = "保存对话框打不开，已导出到程序目录下的 data\\exports"
+                target = ""
+
+            if not target and not fallback_note:
+                return {"ok": False, "error": "已取消"}
+
+        if not target:
+            target = os.path.join(self.exports_dir, f"第{week}周值班表.docx")
+
         try:
-            saved = export_roster(roster, names, out_path)
+            saved = export_roster(roster, names, target)
         except FileNotFoundError as exc:
             return {"ok": False, "error": str(exc)}
         except Exception as exc:  # noqa: BLE001
+            # 常见：目标目录没有写权限（比如存到 Program Files 或 C 盘根目录）
+            if not fallback_note:
+                self._log_export_error(f"写入失败：{target}\n{exc!r}\n{traceback.format_exc()}")
+                try:
+                    fallback = os.path.join(self.exports_dir, f"第{week}周值班表.docx")
+                    saved = export_roster(roster, names, fallback)
+                    return {
+                        "ok": True,
+                        "path": saved,
+                        "note": f"原位置写不进去（{exc}），已改存到程序目录下的 data\\exports",
+                    }
+                except Exception:  # noqa: BLE001
+                    pass
             return {"ok": False, "error": f"导出失败：{exc}"}
 
-        return {"ok": True, "path": saved}
+        return {"ok": True, "path": saved, "note": fallback_note}
+
+    def open_exports_folder(self) -> dict:
+        """打开导出目录（导出后用「打开文件夹」按钮调用）。"""
+        try:
+            folder = self.exports_dir
+            os.makedirs(folder, exist_ok=True)
+            os.startfile(folder)  # noqa: S606 - Windows 专用
+            return {"ok": True, "path": folder}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": str(exc)}
 
     @staticmethod
     def _same_person(existing, person) -> bool:

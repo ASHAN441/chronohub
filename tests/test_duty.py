@@ -368,6 +368,36 @@ class ExportTest(unittest.TestCase):
         result = self.api.export_duty(7, os.path.join(self._tmp.name, "x.docx"))
         self.assertFalse(result["ok"])
 
+    def test_exports_dir_is_isolated(self):
+        """兜底导出目录要跟数据放一起，不能写到真实 data/ 里。"""
+        self.assertEqual(self.api.exports_dir, os.path.join(self._tmp.name, "exports"))
+
+    def test_export_falls_back_when_target_unwritable(self):
+        """存到不可写的位置时，不能直接失败——退回到导出目录并说明原因。
+
+        用户实测遇到的就是这一类：保存对话框挑了个写不进去的地方，
+        结果只看到一句"导出失败"，文件没出来。
+        """
+        if not os.path.exists(TEMPLATE):
+            self.skipTest("缺少值班表.docx 模板")
+
+        self.api.generate_duty(3, GROUPS)
+
+        # 用一个"同名文件"占住目录位置，让 makedirs 必然失败
+        blocker = os.path.join(self._tmp.name, "blocked")
+        with open(blocker, "w", encoding="utf-8") as handle:
+            handle.write("x")
+        bad_target = os.path.join(blocker, "值班表.docx")
+
+        result = self.api.export_duty(3, bad_target)
+        self.assertTrue(result["ok"], result.get("error"))
+        self.assertTrue(result.get("note"), "应该告诉用户改存到哪了")
+        self.assertTrue(os.path.exists(result["path"]))
+        self.assertTrue(
+            os.path.abspath(result["path"]).startswith(os.path.abspath(self.api.exports_dir)),
+            "兜底文件必须落在导出目录里",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -3620,7 +3620,10 @@
             if(msg !== '已取消') showToast('导出失败：' + msg);
             return;
           }
-          showToast('已导出：' + res.path);
+          // 成功：提示保存位置，并给一个「打开文件夹」的动作
+          showToast((res.note ? res.note : '已导出：' + res.path),
+            '打开文件夹',
+            function(){ window.pywebview.api.open_exports_folder().catch(function(){}); });
         } catch(e) {
           showToast('导出失败：' + (e && e.message ? e.message : e));
         }

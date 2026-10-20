@@ -140,7 +140,7 @@
     .about-contact{ font-size:12px; color:var(--win-text-muted); }
     .about-copyright{ font-size:12px; color:var(--win-text-muted); margin-top:8px; }
     .win-sidebar-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 6px; }
-    .win-sidebar-head .tb-btn{ height:24px; padding:0 8px; font-size:12px; }
+    .sidebar-tools .tb-btn{ height:24px; padding:0 8px; font-size:12px; }
     .group-header{ font-size:11px; font-weight:600; color:var(--win-text-muted); padding:9px 6px 4px; }
     .win-input{ font-family:inherit; font-size:13px; height:32px; padding:0 10px; border-radius:5px; border:1px solid var(--win-border); background:var(--win-surface); color:var(--win-text); width:100%; }
     .win-field-label{ font-size:12px; color:var(--win-text-muted); }
@@ -419,8 +419,9 @@
   border-color:var(--win-border);
 }
 
-/* 侧边栏标题：原来 12px/600，和下面的说明文字几乎一个分量，改成明显的标题 */
-.win-sidebar-title{ font-size:13px; font-weight:600; color:var(--win-text); letter-spacing:.2px; }
+/* 侧边栏标题：居中放大，作为这一栏的标题立住 */
+.win-sidebar-head{ justify-content:center; padding:2px 6px 9px; }
+.win-sidebar-title{ font-size:14px; font-weight:600; color:var(--win-text); letter-spacing:.5px; }
 
 /* 人员删除：尺寸收小、默认无底色，只在鼠标经过这一行时才浮出底色 */
 .person-del{
@@ -442,7 +443,7 @@
 
 /* 侧边栏里另外两个按钮也并进这套：
    新建分组（带文字的）、人员行的删除 —— 同样是 surface-3 底 + 1px 边 + 5px 圆角 + SVG 图标 */
-.win-sidebar-head .tb-btn{
+.sidebar-tools .tb-btn{
   background:var(--win-surface-3);
   border:1px solid var(--win-border);
   color:var(--win-text);
@@ -450,11 +451,11 @@
   gap:5px;
   transition:background .13s ease, border-color .13s ease;
 }
-.win-sidebar-head .tb-btn:hover{
+.sidebar-tools .tb-btn:hover{
   background:color-mix(in srgb, var(--win-text) 13%, var(--win-surface));
   border-color:color-mix(in srgb, var(--win-text) 24%, var(--win-border));
 }
-.win-sidebar-head .tb-btn svg,
+.sidebar-tools .tb-btn svg,
 .person-del svg{
   width:11px; height:11px; flex:none; fill:none; stroke:currentColor; stroke-width:2.2;
   stroke-linecap:round; stroke-linejoin:round;
@@ -476,9 +477,8 @@
 .group-body{ display:block; }
 .group-block.is-collapsed .group-body{ display:none; }
 
-.sidebar-tools{ display:flex; align-items:center; gap:6px; padding:0 6px 8px; }
-.sidebar-tools .tb-btn{ height:24px; padding:0 8px; font-size:11.5px; }
-.sidebar-tools .spacer{ flex:1; }
+.sidebar-tools{ display:flex; align-items:center; gap:8px; padding:0 6px 9px; }
+.sidebar-tools .tb-btn{ flex:1; justify-content:center; height:28px; padding:0 8px; font-size:12px; }
 .collapse-all{
   border:none; background:transparent; color:var(--win-accent); cursor:pointer;
   font-size:11.5px; padding:2px 4px; border-radius:4px; font-family:inherit;
@@ -562,14 +562,13 @@
         <aside class="win-sidebar">
           <div class="win-sidebar-head">
             <span class="win-sidebar-title">人员分组</span>
-            <button class="tb-btn" type="button"><svg viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></svg>新建分组</button>
           </div>
           <div class="win-sidebar-search">
             <input class="win-input" id="people-search" placeholder="搜索姓名/学号">
           </div>
           <div class="sidebar-tools">
-            <span class="spacer"></span>
-            <button class="collapse-all mark-new" id="collapse-all" type="button">全部收起</button>
+            <button class="tb-btn" type="button"><svg viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></svg>新建分组</button>
+            <button class="collapse-all" id="collapse-all" type="button">全部收起</button>
           </div>
           <div class="win-people-list" id="people-list"></div>
           <div class="collapse-hint" id="collapse-hint"></div>

@@ -54,8 +54,8 @@
 
     .win-body{ display:flex; align-items:stretch; flex:1; min-height:0; }
     .win-sidebar{ width:224px; flex:none; border-right:1px solid var(--win-border); background:var(--win-surface); padding:12px 10px; overflow-y:auto; }
-    .win-sidebar-title{ font-size:12px; font-weight:600; padding:0 6px; }
-    .win-sidebar-sub{ font-size:11px; color:var(--win-text-muted); padding:2px 6px 10px; }
+    .win-sidebar-title{ font-size:14px; font-weight:600; color:var(--win-text); text-align:center; letter-spacing:.5px; padding:2px 6px 1px; }
+    .win-sidebar-sub{ font-size:11px; color:var(--win-text-muted); padding:2px 6px 10px; text-align:center; }
     .win-people-list{ display:flex; flex-direction:column; gap:2px; }
     .person-item{ display:flex; align-items:center; gap:8px; padding:6px; border-radius:5px; cursor:pointer; }
     .person-item:hover{ background:var(--win-surface-3); }
@@ -86,7 +86,9 @@
     .roster-name{ min-width:70px; }
     .roster-meta{ color:var(--win-text-muted); font-size:12px; }
     .roster-group{ margin-left:auto; color:var(--win-text-muted); font-size:12px; }
-    .person-del{ width:20px; height:20px; display:flex; align-items:center; justify-content:center; border:1px solid var(--win-border); background:var(--win-surface-2); color:var(--win-text-muted); cursor:pointer; font-size:13px; padding:0; border-radius:5px; margin-left:auto; }
+    .person-del{ width:18px; height:18px; display:flex; align-items:center; justify-content:center; border:1px solid transparent; background:transparent; color:var(--win-text-muted); cursor:pointer; padding:0; border-radius:5px; margin-left:auto; transition:background .13s ease, color .13s ease, border-color .13s ease; }
+    .person-item:hover .person-del{ background:var(--win-surface-3); border-color:var(--win-border); }
+    .person-del svg{ width:10px; height:10px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
     .person-del:hover{ color:#e81123; background:color-mix(in srgb, #e81123 12%, var(--win-surface)); border-color:color-mix(in srgb, #e81123 45%, var(--win-border)); }
     .person-open{ cursor:pointer; }
     .person-open:hover{ text-decoration:underline; color:var(--win-accent); }
@@ -155,7 +157,9 @@
     .win-form-row{ display:flex; gap:8px; }
     .win-form-row .win-input{ flex:1; width:auto; }
     .win-sidebar-actions{ display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:0 6px 10px; }
-    .win-sidebar-actions .tb-btn{ height:30px; justify-content:center; padding:0 6px; font-size:12px; border:1px solid var(--win-border); border-radius:6px; background:var(--win-surface-2); color:var(--win-text); }
+    .win-sidebar-actions .tb-btn{ height:30px; justify-content:center; padding:0 6px; font-size:12px; border:1px solid var(--win-border); border-radius:5px; background:var(--win-surface-3); color:var(--win-text); gap:5px; }
+    .win-sidebar-actions .tb-btn svg{ width:11px; height:11px; flex:none; fill:none; stroke:currentColor;
+      stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
     .win-sidebar-actions .tb-btn:hover{ background:var(--win-surface-3); border-color:color-mix(in srgb, var(--win-text) 22%, var(--win-border)); }
     .win-sidebar-actions .tb-btn:active{ background:color-mix(in srgb, var(--win-accent) 14%, var(--win-surface)); border-color:var(--win-accent); }
     .win-sidebar-actions .tb-btn.danger{ grid-column:1 / -1; color:light-dark(#c42b1c, #ff9aa2); }
@@ -170,8 +174,27 @@
     .group-block .group-header{ display:flex; align-items:center; justify-content:space-between; gap:4px; cursor:grab; }
     .group-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .group-tools{ display:flex; gap:3px; flex:none; align-items:center; }
-    .group-btn{ width:20px; height:20px; display:flex; align-items:center; justify-content:center; border:1px solid var(--win-border); background:var(--win-surface-2); color:var(--win-text-muted); cursor:pointer; border-radius:5px; font-size:11px; line-height:1; padding:0; }
-    .group-btn:hover{ color:var(--win-text); background:var(--win-surface-3); border-color:color-mix(in srgb, var(--win-text) 22%, var(--win-border)); }
+    .group-btn, .group-toggle{ width:20px; height:20px; display:flex; align-items:center; justify-content:center;
+      border:1px solid var(--win-border); background:var(--win-surface-3); color:var(--win-text-muted);
+      cursor:pointer; border-radius:5px; padding:0; transition:background .13s ease, color .13s ease, border-color .13s ease; }
+    .group-btn svg, .group-toggle svg{ width:11px; height:11px; fill:none; stroke:currentColor; stroke-width:2.2;
+      stroke-linecap:round; stroke-linejoin:round; }
+    .group-toggle{ margin-left:-3px; }
+    .group-toggle svg{ transition:transform .16s ease; }
+    .group-block.is-collapsed .group-toggle svg{ transform:rotate(-90deg); }
+    .group-toggle:disabled{ opacity:.38; cursor:default; }
+    .group-block.is-collapsed .group-name{ opacity:.8; }
+    .group-body{ display:block; }
+    .group-block.is-collapsed .group-body{ display:none; }
+    .collapse-row{ display:flex; align-items:center; gap:6px; padding:0 6px 6px; }
+    .collapse-row .state{ flex:1; font-size:11px; color:var(--win-text-muted); }
+    .collapse-all{ flex:none; border:none; background:transparent; color:var(--win-accent); cursor:pointer;
+      font-size:11.5px; padding:2px 4px; border-radius:4px; font-family:inherit; }
+    .collapse-all:hover{ background:var(--win-accent-soft); }
+    .group-btn:hover, .group-toggle:hover{ color:var(--win-text);
+      background:color-mix(in srgb, var(--win-text) 13%, var(--win-surface));
+      border-color:color-mix(in srgb, var(--win-text) 24%, var(--win-border)); }
+    .group-toggle:disabled:hover{ background:var(--win-surface-3); color:var(--win-text-muted); border-color:var(--win-border); }
     .group-check{ accent-color:var(--win-accent); cursor:pointer; flex:none; margin:0; }
     .group-move{ font-size:8px; }
     .group-del{ font-size:13px; }
@@ -451,10 +474,10 @@
 
   <div class="win-body">
     <aside class="win-sidebar">
-      <div class="win-sidebar-title" style="padding:0 6px;">人员分组</div>
+      <div class="win-sidebar-title">人员分组</div>
       <div class="win-sidebar-sub">拖动调整分组 · 勾选后纳入统计</div>
       <div class="win-sidebar-actions">
-        <button class="tb-btn" id="group-add-btn" type="button">＋ 新建分组</button>
+        <button class="tb-btn" id="group-add-btn" type="button"><svg viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></svg>新建分组</button>
         <button class="tb-btn" id="group-btn" type="button">批量分组</button>
       </div>
       <div class="win-sidebar-actions">
@@ -468,6 +491,10 @@
           <option value="name">姓名</option>
           <option value="id">学号</option>
         </select>
+      </div>
+      <div class="collapse-row">
+        <span class="state" id="collapse-state"></span>
+        <button class="collapse-all" id="collapse-all" type="button">全部收起</button>
       </div>
       <div class="win-people-list" id="people-list"></div>
     </aside>
@@ -1456,6 +1483,7 @@
             updatePeopleCount();
           });
         });
+        updateCollapseState();
       }
 
       function renderPersonRow(i){
@@ -1467,9 +1495,64 @@
         html += '<input type="checkbox" class="person-check" data-idx="'+i+'"'+(checked?' checked':'')+(inScope?'':' disabled')+'>';
         html += '<span class="person-avatar">'+esc(p.name.charAt(0))+'</span>';
         html += '<span class="person-info"><span class="person-name person-open" data-open="'+i+'" title="点击查看该人员课表">'+esc(p.name)+'</span><span class="person-major">'+esc(p.student_id||'')+'</span></span>';
-        html += '<button class="person-del" type="button" data-del="'+i+'" title="删除该人员">×</button>';
+        html += '<button class="person-del" type="button" data-del="'+i+'" title="删除该人员">'+SVG_X+'</button>';
         html += '</label>';
         return html;
+      }
+
+      /* ---------- 分组折叠 ----------
+         折叠状态存 localStorage：退出重开还是上次的样子。
+         注意两个坑：
+         1. 搜索时必须强制展开，否则匹配到的人藏在收起的组里，看着像搜索坏了。
+         2. 切换只切 class、不重绘列表，否则箭头是新建元素，旋转动画放不出来。 */
+      var SVG_CHEVRON = '<svg viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></svg>';
+      var SVG_UP = '<svg viewBox="0 0 24 24"><path d="M6 14.5l6-6 6 6"/></svg>';
+      var SVG_DOWN = '<svg viewBox="0 0 24 24"><path d="M6 9.5l6 6 6-6"/></svg>';
+      var SVG_X = '<svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg>';
+
+      var COLLAPSE_KEY = 'chronohub.sidebar.collapsed';
+
+      function loadCollapsedGroups(){
+        try {
+          var raw = localStorage.getItem(COLLAPSE_KEY);
+          if(!raw) return {};
+          var obj = JSON.parse(raw);
+          if(!obj || typeof obj !== 'object' || Array.isArray(obj)) return {};
+          return obj;
+        } catch(e) {
+          return {};    // 存储坏了不该影响打开
+        }
+      }
+
+      var collapsedGroups = loadCollapsedGroups();
+
+      function saveCollapsedGroups(){
+        try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(collapsedGroups)); } catch(e) {}
+      }
+
+      function isGroupCollapsed(name){
+        if(state.search) return false;      // 搜索时一律展开
+        return !!collapsedGroups[name];
+      }
+
+      function collapseTargets(){
+        var names = groupNames().slice();
+        if(hasUngrouped()) names.push('未分组');
+        return names;
+      }
+
+      function updateCollapseState(){
+        var all = collapseTargets();
+        var collapsedCount = all.filter(function(g){ return !!collapsedGroups[g]; }).length;
+        var anyOpen = all.some(function(g){ return !collapsedGroups[g]; });
+        var btn = document.getElementById('collapse-all');
+        var txt = document.getElementById('collapse-state');
+        if(!btn || !txt) return;
+        btn.textContent = anyOpen ? '全部收起' : '全部展开';
+        btn.disabled = !!state.search;
+        txt.textContent = state.search
+          ? '搜索中 · 已自动展开'
+          : (all.length ? ('共 ' + all.length + ' 个分组' + (collapsedCount ? ' · ' + collapsedCount + ' 个已收起' : '')) : '');
       }
 
       function renderGroupBlock(name, depth){
@@ -1477,23 +1560,30 @@
         var kids = childrenOf(name);
         var total = groupSelectionIndices(name).length;
         var filtered = state.group === name;
+        var collapsed = isGroupCollapsed(name);
 
         var html = '';
-        html += '<div class="group-block'+(filtered?' is-filtered':'')+'" data-group="'+esc(name)+'" style="margin-left:'+(depth * 12)+'px">';
+        html += '<div class="group-block'+(filtered?' is-filtered':'')+(collapsed?' is-collapsed':'')+'" data-group="'+esc(name)+'" style="margin-left:'+(depth * 12)+'px">';
         html += '<div class="group-header" draggable="true" data-group="'+esc(name)+'">';
+        html += '<button class="group-toggle" type="button" data-toggle="'+esc(name)+'" title="'+(state.search ? '搜索时自动展开' : (collapsed ? '展开' : '收起'))+'"'+(state.search ? ' disabled' : '')+'>'+SVG_CHEVRON+'</button>';
         html += '<span class="group-name group-name-edit" data-edit="'+esc(name)+'" title="点击编辑分组名称和上级">'+esc(name)+' · '+total+' 人</span>';
         html += '<span class="group-tools">';
         html += '<input type="checkbox" class="group-check" data-check="'+esc(name)+'" title="全选 / 取消本组人员"'+(groupAllSelected(name) ? ' checked' : '')+'>';
-        html += '<button class="group-btn group-move" type="button" data-move="up" data-group="'+esc(name)+'" title="上移">▲</button>';
-        html += '<button class="group-btn group-move" type="button" data-move="down" data-group="'+esc(name)+'" title="下移">▼</button>';
-        html += '<button class="group-btn group-del" type="button" data-group="'+esc(name)+'" title="删除分组及子分组">×</button>';
+        html += '<button class="group-btn group-move" type="button" data-move="up" data-group="'+esc(name)+'" title="上移">'+SVG_UP+'</button>';
+        html += '<button class="group-btn group-move" type="button" data-move="down" data-group="'+esc(name)+'" title="下移">'+SVG_DOWN+'</button>';
+        html += '<button class="group-btn group-del" type="button" data-group="'+esc(name)+'" title="删除分组及子分组">'+SVG_X+'</button>';
         html += '</span>';
         html += '</div>';
+
+        // 人员行包一层 group-body：收起时整块 display:none，不用重建 DOM
+        html += '<div class="group-body">';
         direct.forEach(function(i){ html += renderPersonRow(i); });
         kids.forEach(function(child){ html += renderGroupBlock(child, depth + 1); });
         if(direct.length === 0 && kids.length === 0){
           html += '<div class="group-empty">拖到这里</div>';
         }
+        html += '</div>';
+
         html += '</div>';
         return html;
       }
@@ -1501,12 +1591,17 @@
       function renderUngroupedBlock(){
         var indices = sidebarPeopleInGroup('未分组');
         var total = groupSelectionIndices('未分组').length;
-        var html = '<div class="group-block" data-group="未分组">';
-        html += '<div class="group-header"><span class="group-name">未分组 · '+total+' 人</span>';
+        var collapsed = isGroupCollapsed('未分组');
+        var html = '<div class="group-block'+(collapsed?' is-collapsed':'')+'" data-group="未分组">';
+        html += '<div class="group-header">';
+        html += '<button class="group-toggle" type="button" data-toggle="未分组" title="'+(state.search ? '搜索时自动展开' : (collapsed ? '展开' : '收起'))+'"'+(state.search ? ' disabled' : '')+'>'+SVG_CHEVRON+'</button>';
+        html += '<span class="group-name">未分组 · '+total+' 人</span>';
         html += '<span class="group-tools"><input type="checkbox" class="group-check" data-check="未分组" title="全选 / 取消本组人员"'+(groupAllSelected('未分组') ? ' checked' : '')+'></span>';
         html += '</div>';
+        html += '<div class="group-body">';
         indices.forEach(function(i){ html += renderPersonRow(i); });
         if(indices.length === 0 && total === 0) html += '<div class="group-empty">拖到这里</div>';
+        html += '</div>';
         html += '</div>';
         return html;
       }
@@ -2214,6 +2309,17 @@
       document.getElementById('editgroup-name').addEventListener('keydown', function(e){
         if(e.key === 'Enter') confirmEditGroup();
       });
+      document.getElementById('collapse-all').addEventListener('click', function(){
+        var all = collapseTargets();
+        var anyOpen = all.some(function(g){ return !collapsedGroups[g]; });
+        all.forEach(function(g){
+          if(anyOpen) collapsedGroups[g] = true;
+          else delete collapsedGroups[g];
+        });
+        saveCollapsedGroups();
+        renderPeople();
+      });
+
       document.getElementById('people-search').addEventListener('input', function(e){
         state.search = e.target.value.trim();
         renderPeople();
@@ -2267,6 +2373,22 @@
       }
 
       peopleListEl.addEventListener('click', function(e){
+        var toggle = e.target.closest ? e.target.closest('.group-toggle') : null;
+        if(toggle){
+          e.preventDefault();
+          e.stopPropagation();
+          if(toggle.disabled) return;
+          var toggleGroup = toggle.getAttribute('data-toggle');
+          if(collapsedGroups[toggleGroup]) delete collapsedGroups[toggleGroup];
+          else collapsedGroups[toggleGroup] = true;
+          saveCollapsedGroups();
+          // 只切 class、不重绘：箭头是同一个元素，旋转才有过渡动画
+          var block = toggle.closest('.group-block');
+          if(block) block.classList.toggle('is-collapsed', !!collapsedGroups[toggleGroup]);
+          toggle.title = collapsedGroups[toggleGroup] ? '展开' : '收起';
+          updateCollapseState();
+          return;
+        }
         var edit = e.target.closest ? e.target.closest('.group-name-edit') : null;
         if(edit){
           e.preventDefault();
@@ -2318,7 +2440,7 @@
       });
 
       peopleListEl.addEventListener('dragstart', function(e){
-        if(e.target.closest && e.target.closest('.group-btn, .group-check')){
+        if(e.target.closest && e.target.closest('.group-btn, .group-check, .group-toggle')){
           e.preventDefault();
           return;
         }

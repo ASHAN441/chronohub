@@ -18,6 +18,7 @@ pywebview 的窗口本身就是一个 Qt 窗口，渲染用 QtWebEngine。
 from __future__ import annotations
 
 import os
+import sys
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -111,7 +112,87 @@ def _report_fatal() -> str:
     return text
 
 
+def _tk_selfcheck() -> int:
+    """诊断用：逐项验证导出链路依赖在打包后是否可用。
+
+    导入课表 / 导出值班表都靠 tkinter 弹对话框，导出还要 python-docx + lxml。
+    这些在开发环境下一定正常，打包后可能因为数据文件/DLL 没带全而失败——
+    而且只有用户点下去时才暴露。所以留一个可主动验证的入口：
+
+        .\\空课表PRO.exe --selfcheck      （--tk-check 是它的别名）
+
+    结果写到 data/logs/selfcheck.log。
+    """
+    lines = []
+
+    def check(label, fn):
+        try:
+            detail = fn()
+            lines.append(f"[OK]   {label}" + (f" — {detail}" if detail else ""))
+        except Exception:  # noqa: BLE001
+            lines.append(f"[FAIL] {label}\n{traceback.format_exc()}")
+
+    def _tk():
+        import tkinter as tk
+
+        root = tk.Tk()
+        root.withdraw()
+        root.destroy()
+        return ""
+
+    def _docx():
+        from docx import Document
+
+        return f"Document={Document.__name__}"
+
+    def _lxml():
+        import lxml.etree as etree
+
+        return f"LXML={etree.LXML_VERSION}"
+
+    def _template():
+        from .docx_export import template_path
+
+        path = template_path()
+        if not path:
+            raise FileNotFoundError("找不到值班表.docx")
+        return path
+
+    def _export():
+        from .docx_export import export_roster
+
+        roster = {
+            "week": 99,
+            "assignments": [
+                {"day": 1, "block": 0, "start": 1, "end": 2,
+                 "kind": "member", "person": "SELFTEST"},
+                {"day": 1, "block": 4, "start": 9, "end": 10,
+                 "kind": "dual", "minister": "SELFTEST", "hall": "SELFTEST"},
+            ],
+        }
+        out = str(Path(sub_dir("exports")) / "selftest.docx")
+        export_roster(roster, {"SELFTEST": "自检"}, out)
+        return f"{out} ({os.path.getsize(out)} bytes)"
+
+    check("tkinter 创建窗口", _tk)
+    check("import lxml.etree", _lxml)
+    check("import python-docx", _docx)
+    check("找到模板", _template)
+    check("按模板导出 docx", _export)
+
+    text = "\n".join(lines)
+    try:
+        log = Path(sub_dir("logs")) / "selfcheck.log"
+        log.write_text(text, encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        pass
+    return 0
+
+
 def main() -> int:
+    if "--selfcheck" in sys.argv or "--tk-check" in sys.argv:
+        return _tk_selfcheck()
+
     try:
         _run()
     except Exception:  # noqa: BLE001

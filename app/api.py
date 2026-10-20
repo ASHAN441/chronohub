@@ -687,11 +687,35 @@ class Api:
             pass
 
     def _ask_save_path(self, week: int) -> str:
-        """弹保存对话框；用户取消返回空串。
+        """让用户选保存位置；取消返回空串。
 
-        对话框本身出问题是允许抛的，由调用方决定退回哪里——不能因为
-        「挑不了保存位置」就整个导出失败。
+        首选 pywebview 自带的对话框：它走 Qt 主线程、和界面是同一个 GUI 栈。
+        tkinter 是从 js_api 的子线程里弹的，打包后不一定可靠，只作兜底。
         """
+        filename = f"第{week}周值班表.docx"
+
+        window = self._window
+        if window is not None:
+            try:
+                import webview
+
+                dialog = getattr(webview, "FileDialog", None)
+                dialog_type = dialog.SAVE if dialog is not None else webview.SAVE_DIALOG
+                result = window.create_file_dialog(
+                    dialog_type,
+                    save_filename=filename,
+                    file_types=("Word 文档 (*.docx)",),
+                )
+                if not result:
+                    return ""
+                if isinstance(result, (list, tuple)):
+                    return str(result[0])
+                return str(result)
+            except Exception as exc:  # noqa: BLE001
+                self._log_export_error(
+                    f"pywebview 保存对话框失败，改用 tkinter：{exc!r}\n{traceback.format_exc()}"
+                )
+
         root = tk.Tk()
         root.withdraw()
         try:
@@ -702,7 +726,7 @@ class Api:
             return filedialog.asksaveasfilename(
                 title="导出值班表",
                 defaultextension=".docx",
-                initialfile=f"第{week}周值班表.docx",
+                initialfile=filename,
                 initialdir=_default_save_dir(),
                 filetypes=[("Word 文档", "*.docx")],
             ) or ""

@@ -32,7 +32,8 @@ venv/
 .ruff_cache/
 
 # ===== 构建产物 =====
-build/
+# PyInstaller 工作目录（build、build2… 都可能出现）
+build*/
 dist/
 # PyInstaller 自动生成的 spec 不入库，但 packaging/ 下手工维护的构建配置要入库
 *.spec

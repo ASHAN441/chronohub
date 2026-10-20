@@ -92,6 +92,19 @@ class ResourceLayoutTest(unittest.TestCase):
         self.assertIn('"web"', content, "spec 必须把 web/ 作为数据一起打包")
         self.assertIn("console=False", content, "窗口程序不应留控制台")
 
+    def test_spec_has_boot_splash(self):
+        """打包启动图要打进 exe —— 它负责盖住「解压」那段黑屏。"""
+        spec = os.path.join(ROOT, "packaging", "ChronoHub.spec")
+        with open(spec, encoding="utf-8") as handle:
+            content = handle.read()
+        self.assertIn("Splash(", content, "spec 必须声明启动图")
+        self.assertIn("splash.png", content)
+        self.assertIn("splash=splash", content, "启动图要传给 EXE，否则不生效")
+        self.assertTrue(
+            os.path.exists(os.path.join(ROOT, "packaging", "splash.png")),
+            "仓库里应有 packaging/splash.png",
+        )
+
     def test_spec_bundles_duty_template(self):
         """值班表导出模板必须打进包里，否则打包后一点「导出」就报找不到模板。"""
         spec = os.path.join(ROOT, "packaging", "ChronoHub.spec")

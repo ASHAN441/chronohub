@@ -410,26 +410,27 @@
     /* ===== 开屏（v3.3.2 新增） ===== */
     .splash{ position:fixed; inset:0; z-index:9000; background:#000;
       display:flex; flex-direction:column; align-items:center; justify-content:center; gap:26px; }
-    .splash-logo{ width:184px; height:auto; display:block; opacity:0; transform:scale(.92); }
+    /* 台标不做入场动画：打包启动图里已经把它画在屏幕上了，再淡入一次会闪。
+       衔接点是「同一块黑、同一个位置、同一个尺寸」，只让文字动。 */
+    .splash-logo{ width:184px; height:auto; display:block; }
     .splash-line{ display:flex; align-items:baseline; gap:16px; }
     .splash-w{ color:#fff; font-size:30px; font-weight:600; letter-spacing:.18em;
       margin-right:-.18em; opacity:0; transform:translateY(10px); }
-    .splash-rule{ width:0; height:1px; background:rgba(255,255,255,.38); }
+    .splash-bar{ width:320px; height:3px; border-radius:2px; background:rgba(255,255,255,.14); overflow:hidden; }
+    .splash-bar i{ display:block; width:0; height:100%; border-radius:2px; background:#fff; }
 
-    .splash.go .splash-logo{ animation:spLogo .70s cubic-bezier(.2,.8,.2,1) .10s both; }
     .splash.go .splash-w:nth-child(1){ animation:spWord .82s cubic-bezier(.2,.8,.2,1) .40s both; }
     .splash.go .splash-w:nth-child(2){ animation:spWord .82s cubic-bezier(.2,.8,.2,1) .62s both; }
     .splash.go .splash-w:nth-child(3){ animation:spWord .82s cubic-bezier(.2,.8,.2,1) .84s both; }
-    .splash.go .splash-rule{ animation:spRule .95s cubic-bezier(.2,.8,.2,1) 1.10s both; }
+    .splash.go .splash-bar i{ animation:spBar 2.10s cubic-bezier(.2,.8,.2,1) .10s forwards; }
     .splash.out{ animation:spOut .78s cubic-bezier(.4,0,.6,1) both; }
 
-    @keyframes spLogo{ from{ opacity:0; transform:scale(.92); } to{ opacity:1; transform:scale(1); } }
     @keyframes spWord{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:translateY(0); } }
-    @keyframes spRule{ from{ width:0; } to{ width:96px; } }
+    @keyframes spBar{ from{ width:0; } to{ width:92%; } }
     @keyframes spOut{ from{ opacity:1; transform:scale(1); } to{ opacity:0; transform:scale(1.035); } }
 
     @media (prefers-reduced-motion: reduce){
-      .splash.go .splash-logo, .splash.go .splash-w, .splash.go .splash-rule, .splash.out{
+      .splash.go .splash-w, .splash.go .splash-bar i, .splash.out{
         animation-duration:.01ms !important; }
     }
   </style>
@@ -442,7 +443,7 @@
     <div class="splash-line">
       <span class="splash-w">ALL</span><span class="splash-w">FOR</span><span class="splash-w">SYNUTV</span>
     </div>
-    <div class="splash-rule"></div>
+    <div class="splash-bar"><i></i></div>
   </div>
   <div class="win-titlebar">
     <div class="win-titlebar-left">
@@ -3132,10 +3133,15 @@
         splashGone = true;
         var el = document.getElementById('splash');
         if(!el) return;
-        el.classList.add('out');
+        // 数据已就绪：进度条补满，再退场。这样「100%」等于「真的可以用了」
+        var bar = el.querySelector('.splash-bar i');
+        if(bar){ bar.style.transition = 'width .18s linear'; bar.style.width = '100%'; }
         setTimeout(function(){
-          if(el.parentNode) el.parentNode.removeChild(el);
-        }, 820);
+          el.classList.add('out');
+          setTimeout(function(){
+            if(el.parentNode) el.parentNode.removeChild(el);
+          }, 820);
+        }, 170);
       }
 
       function splashReady(){

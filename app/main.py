@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -32,6 +33,38 @@ from .people_store import storage_path
 
 # 记住 Qt 侧对象，供后续创建内嵌浏览器窗口使用
 QT = {"app": None}
+
+
+def _splash(text=None) -> None:
+    """操作打包后的启动图（bootloader 阶段那张）。
+
+    text=None 表示关闭。开发环境没有 pyi_splash 模块，静默跳过。
+    """
+    try:
+        import pyi_splash  # type: ignore
+    except Exception:  # noqa: BLE001
+        return
+    try:
+        if text is None:
+            pyi_splash.close()
+        else:
+            pyi_splash.update_text(text)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _boot_log(note: str) -> None:
+    """记录启动各阶段的时间点。
+
+    打包后排查「为什么启动慢」用：日志里第一条出现时，说明解压已完成、
+    Python 已经开始跑——和「双击」时刻的差值就是解压耗时。
+    """
+    try:
+        path = Path(sub_dir("logs")) / "boot-timing.log"
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] {note}\n")
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _html_path() -> str:
@@ -55,7 +88,13 @@ def _after_start(api: Api) -> None:
 
 
 def _run() -> None:
+    _boot_log("主流程开始（Python 已启动，解压应已完成）")
+    _splash("正在加载界面组件…")
+
     api = Api()
+    _boot_log("Api 初始化完成")
+    _splash("正在创建窗口…")
+
     window = webview.create_window(
         f"{APP_NAME} v{VERSION}",
         _html_path(),
@@ -65,6 +104,23 @@ def _run() -> None:
         min_size=(1080, 660),
     )
     api._window = window
+    _boot_log("窗口对象已创建")
+
+    # 页面加载完成 = HTML 开屏已经画出来了（两者构图一致，切换看不出），
+    # 这时才关启动图；早关会露出一小段白。
+    def _on_page_loaded(*_args):
+        _boot_log("页面加载完成，关闭启动图")
+        _splash(None)
+
+    try:
+        window.events.loaded += _on_page_loaded
+    except Exception:  # noqa: BLE001
+        pass
+
+    # 兜底：万一 loaded 没触发，20 秒后强关，绝不能让启动图一直挡在最上层
+    threading.Timer(20.0, _splash, args=(None,)).start()
+
+    _boot_log("进入 webview.start")
     webview.start(
         _after_start,
         api,

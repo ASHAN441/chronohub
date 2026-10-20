@@ -71,6 +71,19 @@ a = Analysis(
     optimize=0,
 )
 
+# 启动图：bootloader 阶段就显示，覆盖「解压 exe」那段黑屏。
+# 图和 web/index.html 里的 HTML 开屏同构图（黑底 + 台标 + 同位置进度槽），
+# 所以窗口出现时看不出切换。
+splash = Splash(
+    os.path.join(SPEC_DIR, "splash.png"),
+    binaries=a.binaries,
+    datas=a.datas,
+    text_pos=(380, 338),      # 画布中心锚点，正好在进度槽下方
+    text_size=10,
+    text_color="#7a7a7a",
+    text_default="正在启动…",
+)
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
@@ -93,4 +106,5 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=ICON,
+    splash=splash,
 )

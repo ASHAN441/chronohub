@@ -415,8 +415,11 @@
        衔接点是「同一块黑、同一个位置、同一个尺寸」，只让文字动。 */
     .splash-logo{ width:184px; height:auto; display:block; }
     .splash-line{ display:flex; align-items:baseline; gap:16px; }
-    .splash-w{ color:#fff; font-size:30px; font-weight:600; letter-spacing:.18em;
-      margin-right:-.18em; opacity:0; transform:translateY(10px); }
+    /* 英文用 Bahnschrift：几何感、略窄，全大写在黑底上很有分量。
+       Windows 自带，不用打包字体文件；缺失时退到 Segoe UI。 */
+    .splash-w{ color:#fff; font-size:31px; font-weight:600; letter-spacing:.16em;
+      font-family:Bahnschrift, "Segoe UI Semibold", "Segoe UI", sans-serif;
+      margin-right:-.16em; opacity:0; transform:translateY(10px); }
     .splash-bar{ width:320px; height:3px; border-radius:2px; background:rgba(255,255,255,.14); overflow:hidden; }
     .splash-bar i{ display:block; width:0; height:100%; border-radius:2px; background:#fff; }
 

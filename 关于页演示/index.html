@@ -456,6 +456,16 @@
     }
   
 
+/* ===== 品牌口号（对齐开屏动画） ===== */
+.about-slogan{
+  display:flex; justify-content:center; gap:16px; margin-top:32px;
+  font-family:'ChronoHub Display', "Smiley Sans", "Segoe UI Semibold", sans-serif;
+  font-size:44px; font-weight:600; letter-spacing:.12em;
+  color:var(--win-text);
+}
+.about-slogan span{ margin-right:-.12em; }
+.about-rule{ width:320px; height:1px; margin:18px auto 0; background:var(--win-border); }
+
 /* ===== demo 外壳 ===== */
 .demo-bar{
   flex:none; display:flex; align-items:center; gap:10px; padding:7px 14px; font-size:12px;
@@ -498,19 +508,10 @@ body{ display:flex; flex-direction:column; height:100vh; }
             开发者：阿山 · ashan441@163.com · © 2026 阿山
           </div>
 
-          <div class="about-grid">
-            <div class="about-cell"><b>教务账号</b><span>账号存本地 SQLite，密码用 Windows DPAPI 加密，只有这台电脑能解开</span></div>
-            <div class="about-cell"><b>自动入库</b><span>内嵌 Chromium 自动登录教务系统，导出的课表 PDF 直接解析入库，不用手动选文件</span></div>
-
-            <div class="about-cell"><b>课表解析</b><span>支持网格版式与列表版式两种 PDF，自动展开单双周与周次区间</span></div>
-            <div class="about-cell"><b>多人空课表</b><span>叠加多人课表找共同空闲，可按周次统计；分组可折叠，拖一拖就能换组</span></div>
-
-            <div class="about-cell"><b>特殊安排</b><span>例会、值班、调课停课这类课表里没有的占用，手动标一下就按没空算</span></div>
-            <div class="about-cell"><b>排值班表</b><span>1-8 节按人补位、9-10 节双岗（部长 / 台务），每人每周最多一次</span></div>
-
-            <div class="about-cell"><b>导出值班表</b><span>按 Word 模板填表，字体字号与模板一致；也能手动改次数，改动都留有记录</span></div>
-            <div class="about-cell"><b>本地优先</b><span>全部数据存在程序目录下的 data/，不上传任何服务器</span></div>
-          </div>
+          <!-- 品牌口号：和开屏动画同一套（得意黑 / 44px / 字距 .12em），
+               下面一道细线呼应开屏进度条收尾的样子 -->
+          <div class="about-slogan"><span>ALL</span><span>FOR</span><span>SYNUTV</span></div>
+          <div class="about-rule"></div>
         </div>
       </div>
     </section>

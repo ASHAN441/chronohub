@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>时枢 ChronoHub</title>
   <style>
+    /* 开屏英文：把 Bahnschrift 一起打包，别人电脑上没有这个字体也是同一个字形。
+       Bahnschrift 是可变字体（Light~Bold），所以声明 100 900 的字重范围。
+       font-display:block —— 开屏宁可等字体也别先闪一下回退字形。 */
+    @font-face{
+      font-family:'ChronoHub Display';
+      src:url('assets/fonts/bahnschrift.ttf') format('truetype');
+      font-weight:100 900;
+      font-style:normal;
+      font-display:block;
+    }
     :root{ color-scheme: light dark; }
     html, body{ margin:0; height:100%; }
     body{
@@ -418,7 +428,7 @@
     /* 英文用 Bahnschrift：几何感、略窄，全大写在黑底上很有分量。
        Windows 自带，不用打包字体文件；缺失时退到 Segoe UI。 */
     .splash-w{ color:#fff; font-size:31px; font-weight:600; letter-spacing:.16em;
-      font-family:Bahnschrift, "Segoe UI Semibold", "Segoe UI", sans-serif;
+      font-family:'ChronoHub Display', Bahnschrift, "Segoe UI Semibold", "Segoe UI", sans-serif;
       margin-right:-.16em; opacity:0; transform:translateY(10px); }
     .splash-bar{ width:320px; height:3px; border-radius:2px; background:rgba(255,255,255,.14); overflow:hidden; }
     .splash-bar i{ display:block; width:0; height:100%; border-radius:2px; background:#fff; }

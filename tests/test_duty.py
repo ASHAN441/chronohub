@@ -35,18 +35,17 @@ def course(day, start, end, weeks):
     return {"day": day, "start": start, "end": end, "weeks": weeks}
 
 
-def make_people(n_member=25, n_minister=6, n_hall=5):
+def make_people(n_member=25, n_minister=6):
     people = []
     for i in range(n_member):
         people.append(person(f"部员{i}", f"M{i}", "部员"))
     for i in range(n_minister):
         people.append(person(f"部长{i}", f"N{i}", "部长"))
-    for i in range(n_hall):
-        people.append(person(f"台务{i}", f"H{i}", "台务"))
     return people
 
 
-GROUPS = {"member": "部员", "minister": "部长", "hall": "台务"}
+# 台务不再参与排班（2026-10-21），9-10 节只剩部长
+GROUPS = {"member": "部员", "minister": "部长"}
 
 
 class StoreTest(unittest.TestCase):
@@ -63,8 +62,7 @@ class StoreTest(unittest.TestCase):
             "groups": GROUPS,
             "assignments": [
                 {"day": 1, "block": 0, "start": 1, "end": 2, "kind": "member", "person": "M0"},
-                {"day": 1, "block": 4, "start": 9, "end": 10, "kind": "dual",
-                 "minister": "N0", "hall": "H0"},
+                {"day": 1, "block": 4, "start": 9, "end": 10, "kind": "minister", "person": "N0"},
             ],
         }
         save_rosters([roster], self.path)
@@ -72,6 +70,28 @@ class StoreTest(unittest.TestCase):
         self.assertEqual(len(loaded), 1)
         self.assertEqual(loaded[0]["week"], 3)
         self.assertEqual(len(loaded[0]["assignments"]), 2)
+
+    def test_old_dual_data_is_migrated(self):
+        """旧数据里 9-10 节是 kind=dual 的「台务+部长」，读的时候要能转过来。
+
+        台务取消后统一成单人：取当年 minister 当 person，hall 丢弃。
+        不迁移的话老值班表会读不出来（或读成空白）。
+        """
+        old = {
+            "week": 1,
+            "groups": {"member": "部员", "minister": "部长", "hall": "台务"},
+            "assignments": [
+                {"day": 1, "block": 4, "start": 9, "end": 10, "kind": "dual",
+                 "minister": "N0", "hall": "H0"},
+            ],
+        }
+        save_rosters([old], self.path)
+        loaded = load_rosters(self.path)
+        item = loaded[0]["assignments"][0]
+        self.assertEqual(item["kind"], "minister")
+        self.assertEqual(item["person"], "N0", "应保留当年的部长")
+        self.assertNotIn("hall", item, "台务字段应该被丢掉")
+        self.assertNotIn("hall", loaded[0]["groups"])
 
     def test_corrupt_file_returns_empty(self):
         with open(self.path, "w", encoding="utf-8") as handle:
@@ -94,15 +114,14 @@ class StoreTest(unittest.TestCase):
         rosters = [
             {"week": 1, "assignments": [
                 {"day": 1, "block": 0, "start": 1, "end": 2, "kind": "member", "person": "A"},
-                {"day": 1, "block": 4, "start": 9, "end": 10, "kind": "dual",
-                 "minister": "B", "hall": "C"}]},
+                {"day": 1, "block": 4, "start": 9, "end": 10, "kind": "minister", "person": "B"}]},
             {"week": 2, "assignments": [
                 {"day": 2, "block": 0, "start": 1, "end": 2, "kind": "member", "person": "A"}]},
         ]
         counts = count_assignments(rosters)
         self.assertEqual(counts["A"], 2)
         self.assertEqual(counts["B"], 1)
-        self.assertEqual(counts["C"], 1)
+        self.assertNotIn("C", counts, "台务不该再被统计")
 
         # 重排第 2 周时，第 2 周的历史不该算进去
         counts = count_assignments(rosters, exclude_week=2)
@@ -131,21 +150,20 @@ class SchedulerTest(unittest.TestCase):
         self.assertEqual(len(assignments), 25)
 
         member_slots = [a for a in assignments if a["kind"] == "member"]
-        dual_slots = [a for a in assignments if a["kind"] == "dual"]
+        minister_slots = [a for a in assignments if a["kind"] == "minister"]
         self.assertEqual(len(member_slots), 20)
-        self.assertEqual(len(dual_slots), 5)
+        self.assertEqual(len(minister_slots), 5)
         self.assertTrue(all(a["person"] for a in member_slots), "部员岗应全部排满")
-        self.assertTrue(all(a["minister"] and a["hall"] for a in dual_slots), "9-10节应全部排满")
+        self.assertTrue(all(a["person"] for a in minister_slots), "9-10节部长岗应全部排满")
+        self.assertFalse(any(a["kind"] == "dual" for a in assignments), "不该再有双岗")
 
     def test_weekly_limit_one(self):
         people = make_people()
         assignments, _ = generate_roster(people, [], 1, GROUPS, {}, random.Random(2))
         seen = {}
         for item in assignments:
-            keys = [item.get("person"), item.get("minister"), item.get("hall")]
-            for key in keys:
-                if not key:
-                    continue
+            key = item.get("person")
+            if key:
                 seen[key] = seen.get(key, 0) + 1
         self.assertEqual(max(seen.values()), 1, "一个人一周不该被排两次")
 
@@ -156,7 +174,7 @@ class SchedulerTest(unittest.TestCase):
             person("满课", "B", "部员", [course(d, 1, 10, list(range(1, 19))) for d in range(1, 6)]),
         ]
         assignments, _ = generate_roster(
-            people, [], 1, {"member": "部员", "minister": "", "hall": ""}, {}, random.Random(3))
+            people, [], 1, {"member": "部员", "minister": ""}, {}, random.Random(3))
         member = [a for a in assignments if a["kind"] == "member"]
         self.assertEqual(sum(1 for a in member if a["person"] == "A"), 1)
         self.assertFalse(any(a["person"] == "B" for a in member), "满课的人不该被排")
@@ -267,8 +285,9 @@ class ApiDutyTest(unittest.TestCase):
         self.api.generate_duty(2, GROUPS)
         payload = self.api.get_duty()
         total = sum(payload["counts"].values())
-        # 第 1 周 20 单岗 + 10 双岗人次 = 30，两周共 60
-        self.assertEqual(total, 60)
+        # 每周 20 个部员岗 + 5 个部长岗 = 25 人次，两周共 50
+        # （以前 9-10 节是台务+部长双岗，每周 30 人次，取消台务后变 25）
+        self.assertEqual(total, 50)
 
     def test_swap_and_candidates(self):
         self.api.generate_duty(1, GROUPS)
@@ -326,11 +345,16 @@ class ApiDutyTest(unittest.TestCase):
         """双岗只能换部长/台务，单岗只能换部员。"""
         self.api.generate_duty(1, GROUPS)
         roster = self.api.get_duty()["rosters"][0]
-        dual = [a for a in roster["assignments"] if a["kind"] == "dual"][0]
+        dual = [a for a in roster["assignments"] if a["kind"] == "minister"][0]
 
+        # 部长岗不能塞部员
         result = self.api.swap_duty(1, dual["day"], dual["block"], "member", "M0")
         self.assertFalse(result["ok"])
-        self.assertIn("只能换", result["error"])
+        self.assertIn("只能换部长", result["error"])
+
+        # 台务这个角色已经不存在了
+        result = self.api.swap_duty(1, dual["day"], dual["block"], "hall", "M0")
+        self.assertFalse(result["ok"])
 
     def test_clear_week(self):
         self.api.generate_duty(1, GROUPS)
@@ -513,7 +537,9 @@ class ExportTest(unittest.TestCase):
                 texts.append(cell.text)
         joined = "\n".join(texts)
         self.assertIn("部员", joined, "表格里应填入部员姓名")
-        self.assertIn("台务：", joined, "9-10 节应填成「台务：x 部长：y」")
+        self.assertIn("部长：", joined, "9-10 节应填成「部长：x」")
+        self.assertNotIn("台务", joined, "台务不该再出现在导出的表里")
+        self.assertIn("(部长)", joined, "模板标签应改成「(部长)」")
 
         # 注意事项要原样保留
         self.assertIn("信息楼108", titles[0])

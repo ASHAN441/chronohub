@@ -666,10 +666,8 @@ class Api:
 
         used = set()
         for item in roster["assignments"]:
-            if item["kind"] == "dual":
-                used.update(k for k in (item.get("minister"), item.get("hall")) if k)
-            else:
-                used.add(item.get("person") or "")
+            if item.get("person"):
+                used.add(item["person"])
 
         slot = None
         for item in roster["assignments"]:
@@ -718,14 +716,13 @@ class Api:
             if slot is None:
                 return {"ok": False, "error": "没找到这个班次"}
 
-            if slot["kind"] == "dual":
-                if role not in ("minister", "hall"):
-                    return {"ok": False, "error": "这个班次只能换部长或台务"}
-                field = role
-            else:
-                if role != "member":
-                    return {"ok": False, "error": "这个班次只能换部员"}
-                field = "person"
+            # 9-10 节是部长岗，其余是部员岗；台务不再参与排班
+            expected = "minister" if slot["kind"] == "minister" else "member"
+            if role != expected:
+                return {
+                    "ok": False,
+                    "error": "这个班次只能换部长" if expected == "minister" else "这个班次只能换部员",
+                }
 
             # ---- 服务端校验：前端只给合法候选，但接口本身必须设防 ----
             # 不校验的话，一次并发/过期请求就能把「当时有课的人」或
@@ -741,9 +738,7 @@ class Api:
             if target is None:
                 return {"ok": False, "error": "没有这个人"}
 
-            role_group = (roster.get("groups") or {}).get(
-                "hall" if role == "hall" else ("minister" if slot["kind"] == "dual" else "member")
-            )
+            role_group = (roster.get("groups") or {}).get(expected)
             if role_group and (target.get("group") or "") != role_group:
                 return {"ok": False, "error": f"这个人不在「{role_group}」分组里"}
 
@@ -753,11 +748,10 @@ class Api:
             for item in roster["assignments"]:
                 if item["day"] == day and item["block"] == block:
                     continue  # 正在被替换的这个班次不算
-                keys = [item.get("person"), item.get("minister"), item.get("hall")]
-                if person_key in [k for k in keys if k]:
+                if item.get("person") == person_key:
                     return {"ok": False, "error": "这个人本周已经排过班（每周最多 1 次）"}
 
-            slot[field] = person_key
+            slot["person"] = person_key
             roster["assignments"] = [
                 item for item in roster["assignments"]
                 if item["day"] != day or item["block"] != block

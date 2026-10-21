@@ -589,9 +589,6 @@
           <label class="tb-field">部长组
             <select class="tb-select" id="duty-minister-group"></select>
           </label>
-          <label class="tb-field">台务组
-            <select class="tb-select" id="duty-hall-group"></select>
-          </label>
           <label class="tb-field">周次
             <select class="tb-select" id="duty-week"></select>
           </label>
@@ -3485,7 +3482,8 @@
 
       /* =========================================================
          排值班表（v3.3.1 新增）
-         1-8 节部员 · 9-10 节部长+台务 · 每人每周最多 1 次 · 次数累计历史
+         1-8 节部员 · 9-10 节部长 · 每人每周最多 1 次 · 次数累计历史
+         （台务不参与排班，2026-10-21 去掉）
          排班算法在后端（app/duty_scheduler.py），前端只负责展示与换人。
          ========================================================= */
 
@@ -3499,8 +3497,7 @@
       function dutyGroups(){
         return {
           member: document.getElementById('duty-member-group').value,
-          minister: document.getElementById('duty-minister-group').value,
-          hall: document.getElementById('duty-hall-group').value
+          minister: document.getElementById('duty-minister-group').value
         };
       }
 
@@ -3528,8 +3525,7 @@
         // 记住当前选的分组，重新加载后恢复——否则每次切页都跳回默认
         var prev = {
           member: document.getElementById('duty-member-group').value,
-          minister: document.getElementById('duty-minister-group').value,
-          hall: document.getElementById('duty-hall-group').value
+          minister: document.getElementById('duty-minister-group').value
         };
 
         if(!isDesktop()){
@@ -3547,11 +3543,10 @@
         }
         dutyState.loaded = true;
 
-        // 分组下拉：用真实存在的分组名，默认猜 部员/部长/台务
+        // 分组下拉：用真实存在的分组名，默认猜 部员/部长
         var names = (dutyState.data.group_names || []).slice();
         fillDutyGroupSelect('duty-member-group', names, prev.member || '部员');
         fillDutyGroupSelect('duty-minister-group', names, prev.minister || '部长');
-        fillDutyGroupSelect('duty-hall-group', names, prev.hall || '台务');
         renderDuty();
       }
 
@@ -3588,21 +3583,21 @@
 
         if(!roster){
           body.innerHTML = '<tr class="duty-empty-row"><td colspan="6">第 ' + week +
-            ' 周还没有排班，选好三个分组后点「生成」</td></tr>';
+            ' 周还没有排班，选好部员组和部长组后点「生成」</td></tr>';
           document.getElementById('duty-summary').innerHTML = '';
           renderDutyCounts();
           return;
         }
 
         var byDayBlock = {};
-        var byDayDual = {};
+        var byDayMinister = {};
         roster.assignments.forEach(function(a){
-          if(a.kind === 'dual') byDayDual[a.day] = a;
+          if(a.kind === 'minister') byDayMinister[a.day] = a;
           else byDayBlock[a.day + '-' + a.block] = a;
         });
 
         var html = '';
-        var memberOpen = 0, dualOpen = 0;
+        var memberOpen = 0, ministerOpen = 0;
 
         for(var bi = 0; bi < MEMBER_BLOCK_LABELS.length; bi++){
           html += '<tr><th>' + MEMBER_BLOCK_LABELS[bi] +
@@ -3622,19 +3617,16 @@
           html += '</tr>';
         }
 
-        html += '<tr><th>第9-10节<br><span style="font-size:10.5px">部长 + 台务</span></th>';
+        html += '<tr><th>第9-10节<br><span style="font-size:10.5px">部长</span></th>';
         for(var day2 = 1; day2 <= 5; day2++){
-          var dual = byDayDual[day2];
-          var minister = dual && dual.minister ? dual.minister : '';
-          var hall = dual && dual.hall ? dual.hall : '';
-          if(!minister || !hall) dualOpen++;
-          html += '<td' + ((!minister || !hall) ? ' class="open"' : '') +
+          var min = byDayMinister[day2];
+          var minister = min && min.person ? min.person : '';
+          if(!minister) ministerOpen++;
+          html += '<td' + (minister ? '' : ' class="open"') +
                   ' data-day="' + day2 + '" data-block="' + MEMBER_BLOCK_LABELS.length + '">' +
                   '<div class="duty-dual">' +
                     '<span><span class="role">部长</span>' +
                       (minister ? esc(dutyPersonName(minister)) : '<b style="color:#c42b1c">缺</b>') + '</span>' +
-                    '<span><span class="role">台务</span>' +
-                      (hall ? esc(dutyPersonName(hall)) : '<b style="color:#c42b1c">缺</b>') + '</span>' +
                   '</div></td>';
         }
         html += '</tr>';
@@ -3643,21 +3635,16 @@
         var totalMember = 5 * MEMBER_BLOCK_LABELS.length;
         var used = {};
         roster.assignments.forEach(function(a){
-          if(a.kind === 'dual'){
-            if(a.minister) used[a.minister] = true;
-            if(a.hall) used[a.hall] = true;
-          } else if(a.person){
-            used[a.person] = true;
-          }
+          if(a.person) used[a.person] = true;
         });
 
         document.getElementById('duty-summary').innerHTML =
           '<span>1-8节 <b>' + totalMember + '</b> 个班次 · 已排 <b>' + (totalMember - memberOpen) + '</b></span>' +
           (memberOpen ? '<span class="warn">缺 <b>' + memberOpen + '</b> 个</span>' : '') +
-          (dualOpen ? '<span class="warn">9-10节缺 <b>' + dualOpen + '</b> 天</span>' : '') +
+          (ministerOpen ? '<span class="warn">9-10节缺 <b>' + ministerOpen + '</b> 天</span>' : '') +
           '<span>本周参与 <b>' + Object.keys(used).length + '</b> 人</span>' +
           '<span>（' + esc(roster.groups.member || '—') + ' / ' +
-            esc(roster.groups.minister || '—') + ' / ' + esc(roster.groups.hall || '—') + '）</span>';
+            esc(roster.groups.minister || '—') + '）</span>';
 
         renderDutyCounts();
       }
@@ -3678,12 +3665,7 @@
         var used = {};
         if(roster){
           roster.assignments.forEach(function(a){
-            if(a.kind === 'dual'){
-              if(a.minister) used[a.minister] = true;
-              if(a.hall) used[a.hall] = true;
-            } else if(a.person){
-              used[a.person] = true;
-            }
+            if(a.person) used[a.person] = true;
           });
         }
 
@@ -3847,27 +3829,9 @@
         var block = parseInt(td.getAttribute('data-block'), 10);
         if(isNaN(day) || isNaN(block)) return;
 
-        var isDual = block === MEMBER_BLOCK_LABELS.length;
-        var box = document.createElement('div');
-        box.className = 'duty-picker';
-
-        if(isDual){
-          var dual = null;
-          roster.assignments.forEach(function(a){
-            if(a.kind === 'dual' && a.day === day) dual = a;
-          });
-          box.innerHTML =
-            '<div class="duty-picker-title">' + DAYS[day-1] + ' 第9-10节 · 换谁</div>' +
-            '<div class="duty-picker-item" data-role="minister"><span>换部长</span>' +
-              '<span class="c">当前：' + esc(dual && dual.minister ? dutyPersonName(dual.minister) : '缺') + '</span></div>' +
-            '<div class="duty-picker-item" data-role="hall"><span>换台务</span>' +
-              '<span class="c">当前：' + esc(dual && dual.hall ? dutyPersonName(dual.hall) : '缺') + '</span></div>';
-          placeDutyPicker(box, td);
-          box.addEventListener('click', function(e){
-            var item = e.target.closest ? e.target.closest('[data-role]') : null;
-            if(!item) return;
-            openDutyRolePicker(td, day, block, item.getAttribute('data-role'));
-          });
+        // 9-10 节只有部长一个岗，不用先选角色，直接进候选列表
+        if(block === MEMBER_BLOCK_LABELS.length){
+          openDutyRolePicker(td, day, block, 'minister');
           return;
         }
 
@@ -3914,7 +3878,8 @@
         var box = document.createElement('div');
         box.className = 'duty-picker';
         box.innerHTML = '<div class="duty-picker-title">' +
-            (role === 'hall' ? '选台务' : '选部长') + ' · ' + DAYS[day-1] + ' 第9-10节</div>' +
+            (role === 'minister' ? '选部长' : '选部员') + ' · ' + DAYS[day-1] +
+              (role === 'minister' ? ' 第9-10节' : '') + '</div>' +
           (list.length
             ? list.map(function(p){
                 return '<div class="duty-picker-item" data-pick="' + esc(p.key) + '">' +
@@ -3952,8 +3917,8 @@
       async function generateDuty(){
         if(!isDesktop()){ showToast('浏览器预览模式：请在桌面应用中排班'); return; }
         var groups = dutyGroups();
-        if(!groups.member && !groups.minister && !groups.hall){
-          showToast('请先选择部员组 / 部长组 / 台务组');
+        if(!groups.member && !groups.minister){
+          showToast('请先选择部员组 / 部长组');
           return;
         }
         var week = dutyWeek();

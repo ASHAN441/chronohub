@@ -45,26 +45,22 @@ def _clean_assignment(item) -> dict | None:
     if not (1 <= day <= 7 and 1 <= start <= end <= 11):
         return None
 
+    # 9-10 节以前是「台务 + 部长」双岗（kind="dual"），现在台务不值班了，
+    # 统一成单人：部长岗。旧数据在这里一次性迁移——取当年的 minister 当 person，
+    # hall 直接丢掉（用户明确说台务不排班）。
     if kind == "dual":
-        minister = str(item.get("minister") or "").strip()
-        hall = str(item.get("hall") or "").strip()
-        return {
-            "day": day,
-            "block": block,
-            "start": start,
-            "end": end,
-            "kind": "dual",
-            "minister": minister,
-            "hall": hall,
-        }
+        person = str(item.get("minister") or "").strip()
+        kind = "minister"
+    else:
+        person = str(item.get("person") or "").strip()
+        kind = "minister" if kind == "minister" else "member"
 
-    person = str(item.get("person") or "").strip()
     return {
         "day": day,
         "block": block,
         "start": start,
         "end": end,
-        "kind": "member",
+        "kind": kind,
         "person": person,
     }
 
@@ -95,7 +91,6 @@ def normalize_roster(data) -> dict | None:
         "groups": {
             "member": str(groups.get("member") or ""),
             "minister": str(groups.get("minister") or ""),
-            "hall": str(groups.get("hall") or ""),
         },
         "assignments": assignments,
         "created_at": str(data.get("created_at") or datetime.now().isoformat(timespec="seconds")),
@@ -154,14 +149,9 @@ def count_assignments(rosters: list, exclude_week: int = None) -> dict:
         if exclude_week is not None and roster["week"] == exclude_week:
             continue
         for item in roster["assignments"]:
-            if item["kind"] == "dual":
-                keys = [item.get("minister"), item.get("hall")]
-            else:
-                keys = [item.get("person")]
-            for key in keys:
-                key = str(key or "").strip()
-                if key:
-                    counts[key] = counts.get(key, 0) + 1
+            key = str(item.get("person") or "").strip()
+            if key:
+                counts[key] = counts.get(key, 0) + 1
     return counts
 
 

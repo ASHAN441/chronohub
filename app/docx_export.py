@@ -66,6 +66,22 @@ def _set_cell_text(cell, text: str) -> None:
         _set_paragraph_text(extra, "")
 
 
+def _fix_minister_label(row) -> None:
+    """把模板里 9-10 节那行的「(台务/部长)」改成「(部长)」。
+
+    台务不再参与排班，导出的表如果还写着「台务/部长」就和内容对不上了。
+    只改含「台务」的那个段落，保留它原有的字号字体。
+    """
+    try:
+        paragraphs = row.cells[0].paragraphs
+    except IndexError:
+        return
+    for paragraph in paragraphs:
+        text = paragraph.text or ""
+        if "台务" in text:
+            _set_paragraph_text(paragraph, text.replace("台务/", "").replace("台务", "部长"))
+
+
 def _row_label(row) -> str:
     """第一列的文字，去掉空白便于匹配。"""
     try:
@@ -76,7 +92,7 @@ def _row_label(row) -> str:
 
 
 def _block_start(label: str):
-    """从「第1、2节」里取出起始节次；双岗行返回 None。"""
+    """从「第1、2节」里取出起始节次；9-10 节的部长行返回 None。"""
     if "台务" in label or "部长" in label:
         return None
     match = re.search(r"第(\d+)", label)
@@ -120,10 +136,10 @@ def export_roster(roster: dict, names: dict, out_path: str, template: str = None
 
     # 按「星期 + 节次」索引本次排班结果
     by_day_block = {}
-    by_day_dual = {}
+    by_day_minister = {}
     for item in roster.get("assignments") or []:
-        if item.get("kind") == "dual":
-            by_day_dual[item["day"]] = item
+        if item.get("kind") == "minister":
+            by_day_minister[item["day"]] = item
         else:
             by_day_block[(item["day"], item.get("start"))] = item
 
@@ -149,19 +165,19 @@ def export_roster(roster: dict, names: dict, out_path: str, template: str = None
             continue
 
         start = _block_start(label)
-        is_dual = start is None
+        is_minister = start is None
+
+        if is_minister:
+            _fix_minister_label(row)
 
         for day in range(1, 6):
             if day >= len(cells):
                 break
             cell = cells[day]
-            if is_dual:
-                item = by_day_dual.get(day)
-                hall = name_of(item.get("hall")) if item else ""
-                minister = name_of(item.get("minister")) if item else ""
-                text = ""
-                if hall or minister:
-                    text = f"台务：{hall}　部长：{minister}"
+            if is_minister:
+                item = by_day_minister.get(day)
+                who = name_of(item.get("person")) if item else ""
+                text = f"部长：{who}" if who else ""
                 _set_cell_text(cell, text)
                 if text:
                     filled += 1

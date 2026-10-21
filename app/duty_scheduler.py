@@ -26,7 +26,7 @@ import random
 from .duty_store import person_key
 
 MEMBER_BLOCKS = [(1, 2), (3, 4), (5, 6), (7, 8)]
-DUAL_BLOCK = (9, 10)
+MINISTER_BLOCK = (9, 10)
 DUTY_DAYS = range(1, 6)  # 周一到周五
 
 
@@ -56,18 +56,23 @@ def is_busy(person: dict, specials: list, key: str, day: int, start: int, end: i
 
 
 def build_slots() -> list:
-    """全部班次：20 个单岗 + 5 个双岗。"""
+    """全部班次：5 天 × (4 个部员岗 + 1 个部长岗) = 25 个。
+
+    9-10 节以前是「台务 + 部长」双岗，现在台务不值班，只剩部长一人。
+    每个 slot 用 role 指明从哪个组里找人，排班逻辑因此不用再区分双岗。
+    """
     slots = []
     for block_index, (start, end) in enumerate(MEMBER_BLOCKS):
         for day in DUTY_DAYS:
             slots.append({
-                "kind": "member", "day": day, "block": block_index,
+                "kind": "member", "role": "member", "day": day, "block": block_index,
                 "start": start, "end": end,
             })
     for day in DUTY_DAYS:
         slots.append({
-            "kind": "dual", "day": day, "block": len(MEMBER_BLOCKS),
-            "start": DUAL_BLOCK[0], "end": DUAL_BLOCK[1],
+            "kind": "minister", "role": "minister", "day": day,
+            "block": len(MEMBER_BLOCKS),
+            "start": MINISTER_BLOCK[0], "end": MINISTER_BLOCK[1],
         })
     return slots
 
@@ -79,7 +84,7 @@ def generate_roster(person_dicts, specials, week, groups, totals, rng=None):
         person_dicts  人员字典列表（Person.to_dict() 的结果）
         specials      手动添加的特殊安排
         week          第几周
-        groups        {"member": 组名, "minister": 组名, "hall": 组名}
+        groups        {"member": 部员组名, "minister": 部长组名}
         totals        历史累计次数 {人员key: 次数}（不会被修改，内部复制）
         rng           随机源，测试时可注入 random.Random(seed)
 
@@ -90,7 +95,7 @@ def generate_roster(person_dicts, specials, week, groups, totals, rng=None):
     totals = dict(totals or {})
 
     pools = {}
-    for role in ("member", "minister", "hall"):
+    for role in ("member", "minister"):
         name = (groups or {}).get(role) or ""
         pools[role] = [
             p for p in person_dicts or []
@@ -118,43 +123,22 @@ def generate_roster(person_dicts, specials, week, groups, totals, rng=None):
         return rng.choice(best)
 
     def difficulty(slot):
-        """可用人数越少越难排。双岗取两个角色里更紧的那个。"""
-        if slot["kind"] == "dual":
-            return min(
-                len(candidates("minister", slot["day"], slot["start"], slot["end"])),
-                len(candidates("hall", slot["day"], slot["start"], slot["end"])),
-            )
-        return len(candidates("member", slot["day"], slot["start"], slot["end"]))
+        """可用人数越少越难排（先排最紧的，避免被人抢光）。"""
+        return len(candidates(slot["role"], slot["day"], slot["start"], slot["end"]))
 
     assignments = []
     for slot in sorted(build_slots(), key=difficulty):
         day, start, end = slot["day"], slot["start"], slot["end"]
-
-        if slot["kind"] == "dual":
-            minister = pick(candidates("minister", day, start, end))
-            hall = pick(candidates("hall", day, start, end))
-            for person in (minister, hall):
-                if person:
-                    key = person_key(person)
-                    used.add(key)
-                    totals[key] = totals.get(key, 0) + 1
-            assignments.append({
-                "day": day, "block": slot["block"], "start": start, "end": end,
-                "kind": "dual",
-                "minister": person_key(minister) if minister else "",
-                "hall": person_key(hall) if hall else "",
-            })
-        else:
-            person = pick(candidates("member", day, start, end))
-            if person:
-                key = person_key(person)
-                used.add(key)
-                totals[key] = totals.get(key, 0) + 1
-            assignments.append({
-                "day": day, "block": slot["block"], "start": start, "end": end,
-                "kind": "member",
-                "person": person_key(person) if person else "",
-            })
+        person = pick(candidates(slot["role"], day, start, end))
+        if person:
+            key = person_key(person)
+            used.add(key)
+            totals[key] = totals.get(key, 0) + 1
+        assignments.append({
+            "day": day, "block": slot["block"], "start": start, "end": end,
+            "kind": slot["kind"],
+            "person": person_key(person) if person else "",
+        })
 
     return assignments, totals
 

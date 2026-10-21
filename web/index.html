@@ -45,7 +45,10 @@
     .win-titlebar{ display:flex; align-items:stretch; height:36px; flex:none; background:var(--win-surface); border-bottom:1px solid var(--win-border); user-select:none; }
     .win-titlebar-left{ display:flex; align-items:center; gap:9px; padding-left:12px; min-width:0;
       flex:1; cursor:default; }
-    .win-logo{ width:18px; height:18px; border-radius:4px; background:var(--win-accent); color:var(--win-accent-fg); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; }
+    /* 应用内 logo 用台标图：标题栏按高度缩，深色模式换白字版
+       （台标里「校园电视台」是深灰，深色底上会消失） */
+    .logo-slot{ display:contents; }
+    .win-logo{ height:15px; width:auto; flex:none; display:block; }
     .win-title{ font-size:12px; color:var(--win-text-muted); white-space:nowrap; }
     .win-controls{ margin-left:auto; display:flex; flex:none; }
     .win-controls button{ width:46px; height:36px; border:none; background:transparent; color:var(--win-text); font-family:inherit; font-size:12px; display:flex; align-items:center; justify-content:center; cursor:default; }
@@ -293,7 +296,7 @@
     /* ================= 合并后新增：关于页 ================= */
     .about-view{ flex:1; display:flex; align-items:center; justify-content:center; padding:24px; overflow:auto; }
     .about-box{ text-align:center; max-width:560px; }
-    .about-big-logo{ width:64px; height:64px; border-radius:16px; background:var(--win-accent); color:var(--win-accent-fg); display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:600; margin:0 auto 14px; }
+    .about-big-logo{ display:block; width:190px; height:auto; margin:0 auto 16px; }
     .about-big-name{ font-size:20px; font-weight:600; }
     .about-big-version{ font-size:13px; color:var(--win-text-muted); margin-top:4px; }
     .about-note{ font-size:12.5px; color:var(--win-text-muted); margin-top:16px; line-height:1.8; }
@@ -466,7 +469,10 @@
     <!-- pywebview-drag-region：无边框窗口靠它拖动。只包标题这一块，
          不含右侧按钮，避免点最小化时变成拖窗口 -->
     <div class="win-titlebar-left pywebview-drag-region">
-      <span class="win-logo">时</span>
+      <picture class="logo-slot">
+        <source srcset="assets/logo-dark.png" media="(prefers-color-scheme: dark)">
+        <img class="win-logo" src="assets/logo.png" alt="">
+      </picture>
       <span class="win-title">时枢 ChronoHub</span>
       <span class="win-version" id="app-version"></span>
     </div>
@@ -685,7 +691,10 @@
       <section class="view" id="view-about">
         <div class="about-view">
           <div class="about-box">
-            <div class="about-big-logo">时</div>
+            <picture class="logo-slot">
+              <source srcset="assets/logo-dark.png" media="(prefers-color-scheme: dark)">
+              <img class="about-big-logo" src="assets/logo.png" alt="SYNUTV 校园电视台">
+            </picture>
             <div class="about-big-name" id="about-big-name">时枢 ChronoHub</div>
             <div class="about-big-version" id="about-big-version">v3.3.2</div>
             <div class="about-note" id="about-note"></div>

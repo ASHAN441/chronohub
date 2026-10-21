@@ -68,6 +68,19 @@
     .tb-info strong{ color:var(--win-text); font-weight:600; }
 
     .win-body{ display:flex; align-items:stretch; flex:1; min-height:0; }
+    /* 无边框窗口的边缘热区：鼠标移到边上给出改大小的光标，按下交给系统处理。
+       z-index 30 —— 在内容之上、模态框(60)之下，弹窗打开时不干扰。
+       四角 10×10，四边 4px：和原生窗口的手感接近，又不会挡住侧边栏的点击。 */
+    .resize-zone{ position:fixed; z-index:30; }
+    .rz-top{ top:0; left:10px; right:10px; height:4px; cursor:ns-resize; }
+    .rz-bottom{ bottom:0; left:10px; right:10px; height:4px; cursor:ns-resize; }
+    .rz-left{ left:0; top:10px; bottom:10px; width:4px; cursor:ew-resize; }
+    .rz-right{ right:0; top:10px; bottom:10px; width:4px; cursor:ew-resize; }
+    .rz-topleft{ top:0; left:0; width:10px; height:10px; cursor:nwse-resize; }
+    .rz-topright{ top:0; right:0; width:10px; height:10px; cursor:nesw-resize; }
+    .rz-bottomleft{ bottom:0; left:0; width:10px; height:10px; cursor:nesw-resize; }
+    .rz-bottomright{ bottom:0; right:0; width:10px; height:10px; cursor:nwse-resize; }
+
     .win-sidebar{ width:224px; flex:none; border-right:1px solid var(--win-border); background:var(--win-surface); padding:12px 10px; overflow-y:auto; }
     .win-sidebar-title{ font-size:14px; font-weight:600; color:var(--win-text); text-align:center; letter-spacing:.5px; padding:2px 6px 1px; }
     .win-sidebar-sub{ font-size:11px; color:var(--win-text-muted); padding:2px 6px 10px; text-align:center; }
@@ -469,7 +482,7 @@
     </div>
     <div class="splash-bar"><i></i></div>
   </div>
-  <div class="win-titlebar">
+  <div class="win-titlebar" id="win-titlebar">
     <!-- pywebview-drag-region：无边框窗口靠它拖动。只包标题这一块，
          不含右侧按钮，避免点最小化时变成拖窗口 -->
     <div class="win-titlebar-left pywebview-drag-region">
@@ -945,7 +958,17 @@
 
   <datalist id="group-options"></datalist>
 
-  <script>
+    <!-- 无边框窗口的边缘拖拽热区 -->
+  <div class="resize-zone rz-top" data-edge="top"></div>
+  <div class="resize-zone rz-bottom" data-edge="bottom"></div>
+  <div class="resize-zone rz-left" data-edge="left"></div>
+  <div class="resize-zone rz-right" data-edge="right"></div>
+  <div class="resize-zone rz-topleft" data-edge="top-left"></div>
+  <div class="resize-zone rz-topright" data-edge="top-right"></div>
+  <div class="resize-zone rz-bottomleft" data-edge="bottom-left"></div>
+  <div class="resize-zone rz-bottomright" data-edge="bottom-right"></div>
+
+<script>
     (function(){
       var DAYS = ['周一','周二','周三','周四','周五','周六','周日'];
       var GROUPS = [{label:'上午',from:1,to:4},{label:'下午',from:5,to:8},{label:'晚上',from:9,to:11}];
@@ -2607,8 +2630,38 @@
         if(day && period) openRoster(day, period);
       });
       document.getElementById('win-min').addEventListener('click', function(){ if(isDesktop()) window.pywebview.api.minimize(); });
-      document.getElementById('win-max').addEventListener('click', function(){ if(isDesktop()) window.pywebview.api.maximize(); });
+
+      /* 最大化 / 还原：同一个按钮来回切，图标跟着变（□ ⇄ ❐）。
+         双击标题栏也走这里，所以两边状态不会错位。 */
+      async function toggleMaximize(){
+        if(!isDesktop()) return;
+        var btn = document.getElementById('win-max');
+        try {
+          var res = await window.pywebview.api.toggle_max();
+          var on = !!(res && res.maximized);
+          btn.textContent = on ? '❐' : '□';
+          btn.setAttribute('aria-label', on ? '向下还原' : '最大化');
+          btn.title = on ? '向下还原' : '最大化';
+        } catch(e) {}
+      }
+
+      document.getElementById('win-max').addEventListener('click', toggleMaximize);
+      document.getElementById('win-titlebar').addEventListener('dblclick', function(e){
+        if(e.target.closest && e.target.closest('.win-controls')) return;
+        toggleMaximize();
+      });
       document.getElementById('win-close').addEventListener('click', function(){ if(isDesktop()) window.pywebview.api.close(); });
+
+      // 边缘拖拽改大小：只把「按到了哪条边」告诉后端，剩下交给系统（startSystemResize）
+      Array.prototype.forEach.call(document.querySelectorAll('.resize-zone'), function(zone){
+        zone.addEventListener('mousedown', function(e){
+          if(e.button !== 0) return;
+          e.preventDefault();
+          if(isDesktop()){
+            window.pywebview.api.start_resize(zone.getAttribute('data-edge')).catch(function(){});
+          }
+        });
+      });
 
       /* =========================================================
          合并后新增 —— 视图切换（左侧导航）

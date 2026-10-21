@@ -47,6 +47,14 @@ from .specials_store import (
 from .system_urls import DEFAULT_LOGIN_URL, SYSTEM_URLS
 
 
+# 无边框窗口的可拖拽边缘 → 组合成 Qt 的 Edges
+_RESIZE_EDGES = {
+    "left": ("left",), "right": ("right",), "top": ("top",), "bottom": ("bottom",),
+    "top-left": ("top", "left"), "top-right": ("top", "right"),
+    "bottom-left": ("bottom", "left"), "bottom-right": ("bottom", "right"),
+}
+
+
 def _default_save_dir() -> str:
     """保存对话框的默认目录：桌面优先，其次用户主目录。
 
@@ -71,6 +79,9 @@ class Api:
         adjust_path: str = None,
     ):
         self._window = None
+        # 无边框窗口：自己记最大化状态（pywebview 不暴露 isMaximized，
+        # 读 Qt 要跨线程往返，没那个必要——状态只由 toggle_max 改）
+        self._maximized = False
         self._qt_app = None
         self._bridge = None
         self._browser = None
@@ -1204,6 +1215,63 @@ class Api:
     def maximize(self) -> None:
         if self._window is not None:
             self._window.maximize()
+
+    def toggle_max(self) -> dict:
+        """最大化 / 还原 来回切。返回切换后的状态，前端据此换图标。"""
+        window = self._window
+        if window is None:
+            return {"ok": False, "maximized": False}
+
+        target = not self._maximized
+        try:
+            if target:
+                window.maximize()
+            else:
+                window.restore()
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": str(exc), "maximized": self._maximized}
+
+        self._maximized = target
+        return {"ok": True, "maximized": target}
+
+    def start_resize(self, edge) -> dict:
+        """无边框窗口的边缘拖拽改大小。
+
+        不自己算宽高：把边缘交给系统（QWindow.startSystemResize），
+        拖动时的吸附、多显示器 DPI、最大化还原都由系统处理，比 JS 里
+        逐帧算窗口尺寸顺滑得多，也不会抖。
+        """
+        edge = str(edge or "").strip()
+        if edge not in _RESIZE_EDGES or self._bridge is None:
+            return {"ok": False}
+
+        def job():
+            native = getattr(self._window, "native", None) if self._window else None
+            if native is None:
+                return
+            try:
+                handle = native.windowHandle()
+            except Exception:  # noqa: BLE001
+                handle = None
+            if handle is None:
+                return
+            try:
+                from PySide6.QtCore import Qt as QtCore
+
+                Edge = QtCore.Edge
+                names = {
+                    "left": Edge.LeftEdge, "right": Edge.RightEdge,
+                    "top": Edge.TopEdge, "bottom": Edge.BottomEdge,
+                }
+                edges = None
+                for part in _RESIZE_EDGES[edge]:
+                    edges = names[part] if edges is None else (edges | names[part])
+                handle.startSystemResize(edges)
+            except Exception:  # noqa: BLE001
+                pass
+
+        self._bridge.run(job)
+        return {"ok": True}
 
     def close(self) -> None:
         if self._window is not None:

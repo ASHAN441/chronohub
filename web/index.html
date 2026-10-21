@@ -300,10 +300,14 @@
     .about-big-name{ font-size:20px; font-weight:600; }
     .about-big-version{ font-size:13px; color:var(--win-text-muted); margin-top:4px; }
     .about-note{ font-size:12.5px; color:var(--win-text-muted); margin-top:16px; line-height:1.8; }
-    .about-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:18px; text-align:left; }
-    .about-cell{ border:1px solid var(--win-border); border-radius:8px; padding:10px 12px; background:var(--win-surface); }
-    .about-cell b{ display:block; font-size:12px; margin-bottom:3px; }
-    .about-cell span{ font-size:12px; color:var(--win-text-muted); line-height:1.6; }
+    /* 品牌口号：字体/字号/字距与开屏动画一致（得意黑 44px、.12em），
+       下面一道 320px 细线呼应开屏进度条收尾的样子。 */
+    .about-slogan{ margin-top:32px;
+      font-family:'ChronoHub Display', "Smiley Sans", "Segoe UI Semibold", sans-serif;
+      font-size:44px; font-weight:600; letter-spacing:.12em; line-height:1.5;
+      color:var(--win-text); }
+    .about-slogan .line{ display:block; margin-right:-.12em; }
+    .about-rule{ width:320px; height:1px; margin:18px auto 0; background:var(--win-border); }
     /* ===== 手动添加的特殊安排（v3.3.1 新增） ===== */
     /* 类名统一加 sp- 前缀：应用里已有 .chip（账号页「课表已入库」标签），不能复用 */
     #special-modal .win-modal-card{ max-height:90vh; display:flex; flex-direction:column; }
@@ -422,7 +426,7 @@
       font-size:10px; line-height:1; padding:0; }
     .duty-adjust-undo:hover{ color:#c42b1c; }
     .duty-chip[data-key]{ cursor:pointer; }
-    /* ===== 开屏（v3.3.2 新增） ===== */
+    /* ===== 开屏 ===== */
     .splash{ position:fixed; inset:0; z-index:9000; background:#000;
       display:flex; flex-direction:column; align-items:center; justify-content:center; gap:26px; }
     /* 台标不做入场动画：打包启动图里已经把它画在屏幕上了，再淡入一次会闪。
@@ -696,14 +700,13 @@
               <img class="about-big-logo" src="assets/logo.png" alt="SYNUTV 校园电视台">
             </picture>
             <div class="about-big-name" id="about-big-name">时枢 ChronoHub</div>
-            <div class="about-big-version" id="about-big-version">v3.3.2</div>
+            <div class="about-big-version" id="about-big-version">v3.4.1</div>
             <div class="about-note" id="about-note"></div>
-            <div class="about-grid">
-              <div class="about-cell"><b>账号与安全</b><span>账号存 SQLite，密码用 Windows DPAPI 加密</span></div>
-              <div class="about-cell"><b>课表解析</b><span>支持网格版式与列表版式两种 PDF，自动展开单双周与周次区间</span></div>
-              <div class="about-cell"><b>本地优先</b><span>全部数据存在本地 data/ 目录，不上传任何服务器</span></div>
-              <div class="about-cell"><b>内嵌浏览器</b><span>Chromium 内核（QtWebEngine），自动登录与导出课表都在应用窗口内完成</span></div>
+            <div class="about-slogan">
+              <span class="line">用影像记录师大</span>
+              <span class="line">用青春诠释梦想</span>
             </div>
+            <div class="about-rule"></div>
           </div>
         </div>
       </section>
@@ -997,7 +1000,7 @@
       ];
 
       var DEFAULT_APP_INFO = {
-        name:'时枢 ChronoHub', version:'3.3.2', org:'SYNUTV',
+        name:'时枢 ChronoHub', version:'3.4.1', org:'SYNUTV',
         developer:'阿山', contact:'ashan441@163.com',
         copyright:'© 2026 阿山',
         merged_from:'由「教务系统管理器 v1.0.0」与「多人空课表 v2.1」合并'
@@ -2035,9 +2038,13 @@
         if(bigVer) bigVer.textContent = 'v' + info.version;
         var note = document.getElementById('about-note');
         if(note){
+          // 三行：一句话简介 / 出品方 / 开发者·邮箱·版权。
+          // 出品方、开发者、邮箱、版权都来自 app/config.py，不在页面里写死。
           note.innerHTML = '多人空闲统计。<br>' +
-            (info.org ? esc(info.org) + ' 出品 · ' : '') +
-            '开发者：' + esc(info.developer || '') + ' · ' + esc(info.contact || '') + ' · ' + esc(info.copyright || '');
+            (info.org ? esc(info.org) + ' 出品<br>' : '') +
+            '开发者：' + esc(info.developer || '') +
+            ' · ' + esc(info.contact || '') +
+            ' · ' + esc(info.copyright || '');
         }
       }
 

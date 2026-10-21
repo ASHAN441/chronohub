@@ -306,6 +306,26 @@ class ApiDutyTest(unittest.TestCase):
                    and a["block"] == slot["block"]][0]
         self.assertEqual(updated["person"], target)
 
+    def test_save_people_refuses_to_blank_existing_file(self):
+        """存储层的硬保险：有内容的文件不能被写成空列表。
+
+        上次事故查不出是哪个调用方写的，所以在 save_people 这一层直接挡住。
+        """
+        import json
+
+        from app.people_store import save_people
+
+        before = len(self.api.get_people())
+        self.assertTrue(before > 0)
+        save_people(self.api.people, self.api.data_path)
+
+        # 任何调用方误传空列表，都应该被拒绝
+        save_people([], self.api.data_path)
+
+        with open(self.api.data_path, encoding="utf-8") as handle:
+            after = len(json.load(handle).get("people", []))
+        self.assertEqual(after, before, "存储层应拒绝把有人的文件写成空")
+
     def test_refresh_never_wipes_people_when_memory_empty(self):
         """内存里没有人时，自动刷新绝不能把磁盘上的人员写没。
 

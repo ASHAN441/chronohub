@@ -1,5 +1,7 @@
 import json
 import os
+import traceback
+from datetime import datetime
 
 from .models import Person
 from .paths import base_dir, data_dir
@@ -52,11 +54,43 @@ def load_data(path: str = DATA_FILE) -> tuple:
     return people, version
 
 
-def save_people(people: list, path: str = DATA_FILE) -> None:
-    """把人员列表保存为本地 JSON（每人记录识别算法版本）。"""
+def _write_log(note: str) -> None:
+    """把人员数据的写入/拒绝记录到 data/logs/people-write.log。
+
+    人员数据被抹过一次（52 人 → 空），当时查不出是谁写的，所以留个流水：
+    以后再有异常，日志里直接有调用栈，不用靠猜。
+    """
+    try:
+        folder = os.path.join(_DATA_DIR, "logs")
+        os.makedirs(folder, exist_ok=True)
+        stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(os.path.join(folder, "people-write.log"), "a", encoding="utf-8") as handle:
+            handle.write(f"\n[{stamp}] {note}\n")
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def save_people(people: list, path: str = DATA_FILE, allow_empty: bool = False) -> None:
+    """把人员列表保存为本地 JSON（每人记录识别算法版本）。
+
+    **默认拒绝把「有内容」的文件写成空列表**。这是刻意的安全阀：
+    读失败和"真的一个人都没有"在代码里长得一模一样，只要哪条自动流程
+    拿到空列表还照常落盘，用户的数据就一次性没了（真实发生过）。
+    确实要清空（用户显式删除最后一个人）时传 allow_empty=True。
+    """
     directory = os.path.dirname(path)
     if directory:
         os.makedirs(directory, exist_ok=True)
+
+    if not people and not allow_empty:
+        existing = load_people(path)
+        if existing:
+            _write_log(
+                f"拒绝写入空列表：{path} 现有 {len(existing)} 人\n"
+                + "".join(traceback.format_stack()[-6:])
+            )
+            return
+
     payload = {"people": [person.to_dict() for person in people]}
     with open(path, "w", encoding="utf-8") as stream:
         json.dump(payload, stream, ensure_ascii=False, indent=2)

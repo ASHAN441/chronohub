@@ -504,7 +504,7 @@ class Api:
         if targets:
             with self._people_lock:
                 self.people = [p for i, p in enumerate(self.people) if i not in targets]
-                self._save_people()
+                self._save_people(allow_empty=True)
         return {"groups": self.get_groups(), "people": self.get_people()}
 
     # ================= 手动添加的特殊安排 =================
@@ -954,9 +954,13 @@ class Api:
                 return
         self.people.append(person)
 
-    def _save_people(self) -> None:
-        """落盘人员列表（需在 _people_lock 保护下调用）。"""
-        save_people(self.people, self.data_path)
+    def _save_people(self, allow_empty: bool = False) -> None:
+        """落盘人员列表（需在 _people_lock 保护下调用）。
+
+        allow_empty 只有「用户显式删到最后一个人」才传 True；其余自动流程
+        一律走默认——避免某次读失败被当成"真的没有人"写回磁盘。
+        """
+        save_people(self.people, self.data_path, allow_empty=allow_empty)
 
     def _merge_and_save(self, person) -> bool:
         """把 person 合并进人员列表并立即落盘，返回是否为「更新已有的人」。

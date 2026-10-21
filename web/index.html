@@ -1552,14 +1552,14 @@
       function renderPeople(){
         var el = document.getElementById('people-list');
         var html = '';
-        if(state.people.length === 0){
-          html = '<div class="win-sidebar-sub">暂无人员</div>';
-        } else {
-          childrenOf('').forEach(function(name){ html += renderGroupBlock(name, 0); });
-          if(hasUngrouped()) html += renderUngroupedBlock();
-          if(!html){
-            html = '<div class="win-sidebar-sub">还没有分组，点上方「＋ 新建分组」开始整理</div>';
-          }
+        // 分组永远要画出来 —— 删完课表数据后分组还在（groups.json 独立于 people），
+        // 界面却什么都没有，用户会以为分组被删了。
+        childrenOf('').forEach(function(name){ html += renderGroupBlock(name, 0); });
+        if(hasUngrouped()) html += renderUngroupedBlock();
+        if(!html){
+          html = state.people.length
+            ? '<div class="win-sidebar-sub">还没有分组，点上方「＋ 新建分组」开始整理</div>'
+            : '<div class="win-sidebar-sub">暂无人员，先导入课表</div>';
         }
         el.innerHTML = html;
         el.querySelectorAll('.person-check').forEach(function(cb){
@@ -3882,6 +3882,9 @@
         var block = parseInt(td.getAttribute('data-block'), 10);
         if(isNaN(day) || isNaN(block)) return;
 
+        var box = document.createElement('div');
+        box.className = 'duty-picker';
+
         // 9-10 节只有部长一个岗，不用先选角色，直接进候选列表
         if(block === MEMBER_BLOCK_LABELS.length){
           openDutyRolePicker(td, day, block, 'minister');
@@ -4078,6 +4081,8 @@
         applyBrowserStatus: applyBrowserStatus,
         getView: currentView,
         state: state,
+        renderPeople: renderPeople,
+        doRemovePeople: doRemovePeople,
         acctState: acctState,
         // 手动添加特殊安排（自检用）
         openSpecialModal: openSpecialModal,

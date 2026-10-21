@@ -458,12 +458,12 @@
 
 /* ===== 品牌口号（对齐开屏动画） ===== */
 .about-slogan{
-  display:flex; justify-content:center; gap:16px; margin-top:32px;
+  margin-top:32px;
   font-family:'ChronoHub Display', "Smiley Sans", "Segoe UI Semibold", sans-serif;
-  font-size:44px; font-weight:600; letter-spacing:.12em;
+  font-size:44px; font-weight:600; letter-spacing:.12em; line-height:1.5;
   color:var(--win-text);
 }
-.about-slogan span{ margin-right:-.12em; }
+.about-slogan .line{ display:block; margin-right:-.12em; }
 .about-rule{ width:320px; height:1px; margin:18px auto 0; background:var(--win-border); }
 
 /* ===== demo 外壳 ===== */
@@ -508,9 +508,12 @@ body{ display:flex; flex-direction:column; height:100vh; }
             开发者：阿山 · ashan441@163.com · © 2026 阿山
           </div>
 
-          <!-- 品牌口号：和开屏动画同一套（得意黑 / 44px / 字距 .12em），
-               下面一道细线呼应开屏进度条收尾的样子 -->
-          <div class="about-slogan"><span>ALL</span><span>FOR</span><span>SYNUTV</span></div>
+          <!-- 品牌口号：字体/字号/字距与开屏动画一致，只是换成了中文两行对仗。
+               得意黑本身是中文标题字，斜体和窄字身正好 -->
+          <div class="about-slogan">
+            <span class="line">用影像记录师大，</span>
+            <span class="line">用青春诠释梦想</span>
+          </div>
           <div class="about-rule"></div>
         </div>
       </div>

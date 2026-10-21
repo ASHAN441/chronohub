@@ -34,7 +34,8 @@ venv/
 # ===== 构建产物 =====
 # PyInstaller 工作目录（build、build2… 都可能出现）
 build*/
-dist/
+# 构建产物：dist/ 以及临时构建目录 dist_staging 等
+dist*/
 # PyInstaller 自动生成的 spec 不入库，但 packaging/ 下手工维护的构建配置要入库
 *.spec
 !packaging/*.spec

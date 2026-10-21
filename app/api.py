@@ -643,10 +643,23 @@ class Api:
         totals = count_assignments(existing, exclude_week=week)
         assignments, _ = generate_roster(people, specials, week, groups or {}, totals)
 
+        # 「本周这个时段不用人值班」是用户手动标的，重排这一周时要保住，
+        # 并且被标记的班次上不排人（否则会出现"有人值班但标了不用"）。
+        off = []
+        for item in existing:
+            if item["week"] == week:
+                off = [list(pair) for pair in (item.get("off") or [])]
+                break
+        off_set = {(pair[0], pair[1]) for pair in off}
+        for item in assignments:
+            if (item["day"], item["block"]) in off_set:
+                item["person"] = ""
+
         roster = normalize_roster({
             "week": week,
             "groups": groups or {},
             "assignments": assignments,
+            "off": off,
         })
         if roster is None:
             return {"ok": False, "error": "排班结果为空"}
@@ -702,6 +715,54 @@ class Api:
             if key:
                 names[key] = person.get("name") or key
         return {"candidates": [{"key": k, "name": names.get(k, k)} for k in keys]}
+
+    def set_duty_off(self, week, day, block, off=True) -> dict:
+        """把某个班次标成「本周不用人值班」，或取消这个标记。
+
+        用途：放假、场地检修、那节课本来就没人用……这类情况不该算"缺人"。
+        标记存在排班表的 off 列表里，和谁值班无关，所以重排时也能保留。
+        """
+        try:
+            week, day, block = int(week), int(day), int(block)
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "参数不合法"}
+        if not (1 <= day <= 7 and 0 <= block <= 4):
+            return {"ok": False, "error": "班次不合理"}
+
+        with self._people_lock:
+            index = None
+            for i, item in enumerate(self.rosters):
+                if item["week"] == week:
+                    index = i
+                    break
+            if index is None:
+                return {"ok": False, "error": "这一周还没排班"}
+
+            roster = json.loads(json.dumps(self.rosters[index]))
+            pairs = [list(pair) for pair in (roster.get("off") or [])]
+            pair = [day, block]
+
+            if off:
+                if pair not in pairs:
+                    pairs.append(pair)
+                # 标了不用人，就把这人撤下来，避免"有人值班"和"不用人"同时成立
+                for item in roster.get("assignments") or []:
+                    if item.get("day") == day and item.get("block") == block:
+                        item["person"] = ""
+            else:
+                pairs = [p for p in pairs if p != pair]
+
+            roster["off"] = pairs
+            cleaned = normalize_roster(roster)
+            if cleaned is None:
+                return {"ok": False, "error": "排班数据异常"}
+            self.rosters[index] = cleaned
+            save_rosters(self.rosters, self.duty_path)
+
+        payload = self.get_duty()
+        payload["ok"] = True
+        payload["week"] = week
+        return payload
 
     def swap_duty(self, week, day, block, role, person_key) -> dict:
         try:

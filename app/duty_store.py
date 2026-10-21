@@ -20,6 +20,12 @@ from datetime import datetime
 
 from .paths import data_dir
 
+# 班次区块：0-3 是部员岗（第1-2 / 3-4 / 5-6 / 7-8 节），4 是 9-10 节的部长岗。
+# 只用来校验「不用人值班」标记的合法性。
+# 不从 duty_scheduler 导入 MEMBER_BLOCKS —— 那个模块反过来 import 本模块的
+# person_key，模块级互相导入会成环。
+_MAX_BLOCK = 4
+
 DUTY_FILE = os.path.join(data_dir(), "duty.json")
 
 
@@ -84,6 +90,20 @@ def normalize_roster(data) -> dict | None:
     if not assignments:
         return None
 
+    # 「本周这个时段不用人值班」——用户在界面上手动标的，和排班结果分开存。
+    # 存成 [[day, block], ...]：即使某个班次上没有 assignment，标记也不会丢。
+    off = []
+    for item in data.get("off") or []:
+        try:
+            day_off, block_off = int(item[0]), int(item[1])
+        except (TypeError, ValueError, IndexError):
+            continue
+        if 1 <= day_off <= 7 and 0 <= block_off <= _MAX_BLOCK:
+            pair = [day_off, block_off]
+            if pair not in off:
+                off.append(pair)
+    off.sort()
+
     groups = data.get("groups") or {}
     return {
         "id": str(data.get("id") or uuid.uuid4().hex[:10]),
@@ -92,6 +112,7 @@ def normalize_roster(data) -> dict | None:
             "member": str(groups.get("member") or ""),
             "minister": str(groups.get("minister") or ""),
         },
+        "off": off,
         "assignments": assignments,
         "created_at": str(data.get("created_at") or datetime.now().isoformat(timespec="seconds")),
     }

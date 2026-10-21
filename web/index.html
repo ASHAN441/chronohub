@@ -386,6 +386,15 @@
     .duty-cell-meta{ display:block; font-size:10.5px; color:var(--win-text-muted); margin-top:1px; }
     .duty-table td.open{ background:color-mix(in srgb, #c42b1c 12%, var(--win-surface)); color:#c42b1c; font-weight:600; }
     .duty-table td.open .duty-cell-meta{ color:color-mix(in srgb, #c42b1c 70%, var(--win-text-muted)); }
+    /* 「本周不用人值班」：灰底虚线，和「缺人」明显区分开 */
+    .duty-table td.duty-off{ background:color-mix(in srgb, var(--win-text) 4%, var(--win-surface));
+      color:var(--win-text-muted); border-style:dashed; }
+    .duty-clear-list{ max-height:260px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;
+      border:1px solid var(--win-border); border-radius:7px; padding:8px; }
+    .duty-clear-item{ display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;
+      padding:5px 6px; border-radius:5px; }
+    .duty-clear-item:hover{ background:var(--win-surface-3); }
+    .duty-clear-item .c{ margin-left:auto; font-size:11.5px; color:var(--win-text-muted); }
     .duty-dual{ display:flex; flex-direction:column; gap:2px; line-height:1.45; }
     .duty-dual span{ font-size:12px; }
     .duty-dual .role{ color:var(--win-text-muted); font-size:10.5px; margin-right:3px; }
@@ -610,6 +619,7 @@
           <button class="tb-btn" id="duty-export" type="button">导出 Word</button>
           <span class="tb-spacer"></span>
           <button class="tb-btn" id="duty-clear" type="button">清除本周</button>
+          <button class="tb-btn" id="duty-clear-many" type="button">清除多周</button>
         </div>
 
         <div class="duty-main">
@@ -862,6 +872,24 @@
           <select class="win-input" id="group-target"></select>
           <button class="tb-btn primary" id="group-apply" type="button">应用到所选</button>
           <button class="tb-btn" id="group-remove" type="button">删除所选</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="win-modal" id="duty-clear-modal" hidden>
+    <div class="win-modal-backdrop" id="duty-clear-backdrop"></div>
+    <div class="win-modal-card">
+      <div class="win-modal-head">
+        <span>清除已排的周</span>
+        <button class="win-modal-close" id="duty-clear-close" type="button" aria-label="关闭">✕</button>
+      </div>
+      <div class="group-modal-body">
+        <div class="win-sidebar-sub" style="padding:0 0 8px">勾选要清除的周，可多选。清除后累计次数会相应回落。</div>
+        <div class="duty-clear-list" id="duty-clear-list"></div>
+        <div class="group-modal-actions">
+          <button class="tb-btn" id="duty-clear-cancel" type="button">取消</button>
+          <button class="tb-btn primary" id="duty-clear-ok" type="button">清除勾选</button>
         </div>
       </div>
     </div>
@@ -3562,6 +3590,31 @@
         sel.value = '1';
       }
 
+      /* 已排过的周在下拉里打勾，一眼能看出哪几周排完了。
+         用签名比对：只有「哪些周排过」真的变了才重建下拉，
+         否则每次 renderDuty 都重建会打断用户正在操作的下拉框。 */
+      var _dutyMarkSig = null;
+
+      function refreshDutyWeekMarks(){
+        var weeks = ((dutyState.data && dutyState.data.rosters) || [])
+          .map(function(r){ return r.week; })
+          .sort(function(a, b){ return a - b; });
+        var sig = weeks.join(',');
+        if(sig === _dutyMarkSig) return;
+        _dutyMarkSig = sig;
+
+        var done = {};
+        weeks.forEach(function(w){ done[w] = true; });
+        var sel = document.getElementById('duty-week');
+        var current = sel.value;
+        var html = '';
+        for(var w = 1; w <= 18; w++){
+          html += '<option value="' + w + '">第 ' + w + ' 周' + (done[w] ? ' ✓' : '') + '</option>';
+        }
+        sel.innerHTML = html;
+        if(current) sel.value = current;
+      }
+
       function fillDutyGroupSelect(id, names, preferred){
         var sel = document.getElementById(id);
         if(!names.length){
@@ -3603,6 +3656,16 @@
         renderDuty();
       }
 
+      /* 这一周某个班次是否标了「不用人值班」 */
+      function isOffSlot(roster, day, block){
+        if(!roster || !roster.off) return false;
+        for(var i = 0; i < roster.off.length; i++){
+          var pair = roster.off[i];
+          if(pair[0] === day && pair[1] === block) return true;
+        }
+        return false;
+      }
+
       function currentRoster(){
         if(!dutyState.data) return null;
         var week = dutyWeek();
@@ -3639,6 +3702,7 @@
             ' 周还没有排班，选好部员组和部长组后点「生成」</td></tr>';
           document.getElementById('duty-summary').innerHTML = '';
           renderDutyCounts();
+          refreshDutyWeekMarks();
           return;
         }
 
@@ -3657,7 +3721,10 @@
                   '<br><span style="font-size:10.5px">部员</span></th>';
           for(var day = 1; day <= 5; day++){
             var item = byDayBlock[day + '-' + bi];
-            if(!item || !item.person){
+            if(isOffSlot(roster, day, bi)){
+              html += '<td class="duty-off" data-day="' + day + '" data-block="' + bi + '">不用人' +
+                      '<span class="duty-cell-meta">点此恢复</span></td>';
+            } else if(!item || !item.person){
               memberOpen++;
               html += '<td class="open" data-day="' + day + '" data-block="' + bi + '">无人可排' +
                       '<span class="duty-cell-meta">点此换人</span></td>';
@@ -3674,6 +3741,13 @@
         for(var day2 = 1; day2 <= 5; day2++){
           var min = byDayMinister[day2];
           var minister = min && min.person ? min.person : '';
+          var ministerOff = isOffSlot(roster, day2, MEMBER_BLOCK_LABELS.length);
+          if(ministerOff){
+            html += '<td class="duty-off" data-day="' + day2 +
+                    '" data-block="' + MEMBER_BLOCK_LABELS.length + '">不用人' +
+                    '<span class="duty-cell-meta">点此恢复</span></td>';
+            continue;
+          }
           if(!minister) ministerOpen++;
           html += '<td' + (minister ? '' : ' class="open"') +
                   ' data-day="' + day2 + '" data-block="' + MEMBER_BLOCK_LABELS.length + '">' +
@@ -3686,6 +3760,7 @@
         body.innerHTML = html;
 
         var totalMember = 5 * MEMBER_BLOCK_LABELS.length;
+        var offCount = (roster.off || []).length;
         var used = {};
         roster.assignments.forEach(function(a){
           if(a.person) used[a.person] = true;
@@ -3695,11 +3770,13 @@
           '<span>1-8节 <b>' + totalMember + '</b> 个班次 · 已排 <b>' + (totalMember - memberOpen) + '</b></span>' +
           (memberOpen ? '<span class="warn">缺 <b>' + memberOpen + '</b> 个</span>' : '') +
           (ministerOpen ? '<span class="warn">9-10节缺 <b>' + ministerOpen + '</b> 天</span>' : '') +
+          (offCount ? '<span>其中 <b>' + offCount + '</b> 个时段不用人</span>' : '') +
           '<span>本周参与 <b>' + Object.keys(used).length + '</b> 人</span>' +
           '<span>（' + esc(roster.groups.member || '—') + ' / ' +
             esc(roster.groups.minister || '—') + '）</span>';
 
         renderDutyCounts();
+        refreshDutyWeekMarks();
       }
 
       function renderDutyCounts(){
@@ -3899,8 +3976,11 @@
           return;
         }
         var list = (res && res.candidates) || [];
+        var slotOff = isOffSlot(roster, day, block);
         box.innerHTML = '<div class="duty-picker-title">' + DAYS[day-1] + ' ' +
             MEMBER_BLOCK_LABELS[block] + ' · 可换的部员</div>' +
+          '<div class="duty-picker-item" data-off="1">' +
+            '<span>' + (slotOff ? '恢复需要人值班' : '这个时段不用人值班') + '</span></div>' +
           (list.length
             ? list.map(function(p){
                 return '<div class="duty-picker-item" data-pick="' + esc(p.key) + '">' +
@@ -3911,6 +3991,8 @@
 
         placeDutyPicker(box, td);
         box.addEventListener('click', function(e){
+          var offItem = e.target.closest ? e.target.closest('[data-off]') : null;
+          if(offItem){ doSetDutyOff(day, block, !slotOff); return; }
           var item = e.target.closest ? e.target.closest('[data-pick]') : null;
           if(!item) return;
           doDutySwap(day, block, 'member', item.getAttribute('data-pick'));
@@ -3931,11 +4013,14 @@
         }
         var list = (res && res.candidates) || [];
 
+        var slotOff = isOffSlot(roster, day, block);
         var box = document.createElement('div');
         box.className = 'duty-picker';
         box.innerHTML = '<div class="duty-picker-title">' +
             (role === 'minister' ? '选部长' : '选部员') + ' · ' + DAYS[day-1] +
               (role === 'minister' ? ' 第9-10节' : '') + '</div>' +
+          '<div class="duty-picker-item" data-off="1">' +
+            '<span>' + (slotOff ? '恢复需要人值班' : '这个时段不用人值班') + '</span></div>' +
           (list.length
             ? list.map(function(p){
                 return '<div class="duty-picker-item" data-pick="' + esc(p.key) + '">' +
@@ -3946,10 +4031,32 @@
 
         placeDutyPicker(box, td);
         box.addEventListener('click', function(e){
+          var offItem = e.target.closest ? e.target.closest('[data-off]') : null;
+          if(offItem){ doSetDutyOff(day, block, !slotOff); return; }
           var item = e.target.closest ? e.target.closest('[data-pick]') : null;
           if(!item) return;
           doDutySwap(day, block, role, item.getAttribute('data-pick'));
         });
+      }
+
+      /* 标记 / 取消「这个时段本周不用人值班」 */
+      async function doSetDutyOff(day, block, off){
+        closeDutyPicker();
+        var roster = currentRoster();
+        if(!roster) return;
+        if(!isDesktop()){ showToast('浏览器预览模式无法修改排班'); return; }
+        try {
+          var res = await window.pywebview.api.set_duty_off(roster.week, day, block, off);
+          if(!res || res.ok === false){
+            showToast('设置失败：' + ((res && res.error) || '未知错误'));
+            return;
+          }
+          dutyState.data = res;
+          renderDuty();
+          showToast(off ? '已标记：这个时段不用人值班' : '已恢复需要人值班');
+        } catch(e) {
+          showToast('设置失败：' + (e && e.message ? e.message : e));
+        }
       }
 
       async function doDutySwap(day, block, role, personKey){
@@ -4033,6 +4140,53 @@
         }
       }
 
+      /* ---------- 多选清除已排的周 ---------- */
+      function openDutyClearMany(){
+        var rosters = (dutyState.data && dutyState.data.rosters) || [];
+        if(!rosters.length){ showToast('还没有排过任何一周'); return; }
+        var list = document.getElementById('duty-clear-list');
+        list.innerHTML = rosters.slice().sort(function(a, b){ return a.week - b.week; })
+          .map(function(r){
+            var filled = (r.assignments || []).filter(function(a){ return a.person; }).length;
+            return '<label class="duty-clear-item">' +
+              '<input type="checkbox" value="' + r.week + '">' +
+              '<span>第 ' + r.week + ' 周</span>' +
+              '<span class="c">' + filled + ' 人 · ' +
+                ((r.off || []).length ? (r.off.length + ' 个时段不用人') : '') + '</span></label>';
+          }).join('');
+        document.getElementById('duty-clear-modal').hidden = false;
+      }
+
+      function closeDutyClearMany(){
+        document.getElementById('duty-clear-modal').hidden = true;
+      }
+
+      async function confirmDutyClearMany(){
+        var boxes = document.querySelectorAll('#duty-clear-list input[type=checkbox]');
+        var weeks = [];
+        Array.prototype.forEach.call(boxes, function(box){
+          if(box.checked) weeks.push(parseInt(box.value, 10));
+        });
+        if(!weeks.length){ showToast('请先勾选要清除的周'); return; }
+        if(!isDesktop()){ showToast('浏览器预览模式无法清除'); return; }
+
+        closeDutyClearMany();
+        var failed = [];
+        for(var i = 0; i < weeks.length; i++){
+          try {
+            var res = await window.pywebview.api.clear_duty(weeks[i]);
+            if(res && res.ok === false) failed.push(weeks[i]);
+            else dutyState.data = res;
+          } catch(e) {
+            failed.push(weeks[i]);
+          }
+        }
+        renderDuty();
+        showToast(failed.length
+          ? ('已清除 ' + (weeks.length - failed.length) + ' 周，失败：第 ' + failed.join('、') + ' 周')
+          : ('已清除 ' + weeks.length + ' 周的排班'));
+      }
+
       function bindDuty(){
         buildDutyWeekSelect();
 
@@ -4040,6 +4194,11 @@
         document.getElementById('duty-reroll').addEventListener('click', generateDuty);
         document.getElementById('duty-export').addEventListener('click', exportDuty);
         document.getElementById('duty-clear').addEventListener('click', clearDuty);
+        document.getElementById('duty-clear-many').addEventListener('click', openDutyClearMany);
+        document.getElementById('duty-clear-close').addEventListener('click', closeDutyClearMany);
+        document.getElementById('duty-clear-cancel').addEventListener('click', closeDutyClearMany);
+        document.getElementById('duty-clear-backdrop').addEventListener('click', closeDutyClearMany);
+        document.getElementById('duty-clear-ok').addEventListener('click', confirmDutyClearMany);
 
         document.getElementById('duty-week').addEventListener('change', function(){
           renderDuty();

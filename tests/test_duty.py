@@ -385,6 +385,29 @@ class ApiDutyTest(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("每周最多", result["error"])
 
+    def test_slot_can_be_marked_off(self):
+        """任意班次可以标「本周不用人值班」，重排时标记要保住。"""
+        self.api.generate_duty(1, GROUPS)
+        payload = self.api.set_duty_off(1, 1, 0, True)
+        self.assertTrue(payload["ok"])
+
+        roster = [r for r in payload["rosters"] if r["week"] == 1][0]
+        self.assertIn([1, 0], roster["off"])
+        slot = [a for a in roster["assignments"] if a["day"] == 1 and a["block"] == 0][0]
+        self.assertEqual(slot["person"], "", "标了不用人，该班次上不该还有人")
+
+        # 重排同一周：标记不能被冲掉，也不能又排上人
+        self.api.generate_duty(1, GROUPS)
+        roster = [r for r in self.api.get_duty()["rosters"] if r["week"] == 1][0]
+        self.assertIn([1, 0], roster["off"], "重排后「不用人」标记应该保留")
+        slot = [a for a in roster["assignments"] if a["day"] == 1 and a["block"] == 0][0]
+        self.assertEqual(slot["person"], "")
+
+        # 取消标记
+        payload = self.api.set_duty_off(1, 1, 0, False)
+        roster = [r for r in payload["rosters"] if r["week"] == 1][0]
+        self.assertNotIn([1, 0], roster["off"])
+
     def test_swap_rejects_wrong_role(self):
         """双岗只能换部长/台务，单岗只能换部员。"""
         self.api.generate_duty(1, GROUPS)

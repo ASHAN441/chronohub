@@ -211,7 +211,11 @@ class Api:
             [person.parsed_with or 0 for person in self.people] or [0]
         )
         with self._people_lock:
-            self._save_people()
+            # 这个方法是自动触发的（前端渲染后会调一次）。如果内存里没有人
+            # （启动时文件正被占用、读到半截 JSON 等），回写就会把磁盘上的
+            # 人员一次性抹掉——这是不可逆的数据毁灭，绝不能发生。
+            if self.people:
+                self._save_people()
         return {
             "people": self.get_people(),
             "groups": self.get_groups(),

@@ -306,6 +306,30 @@ class ApiDutyTest(unittest.TestCase):
                    and a["block"] == slot["block"]][0]
         self.assertEqual(updated["person"], target)
 
+    def test_refresh_never_wipes_people_when_memory_empty(self):
+        """内存里没有人时，自动刷新绝不能把磁盘上的人员写没。
+
+        真实事故：启动时 people.json 正被占用/复制，load 读到空列表，
+        前端渲染后又调 refresh_schedules()，它无条件回写 → 52 人的数据
+        变成 {"people": []}，不可逆。
+        """
+        import json
+
+        from app.people_store import save_people
+
+        # 先确保磁盘上真有人（setUp 是直接塞内存，没落盘）
+        save_people(self.api.people, self.api.data_path)
+        before = len(self.api.get_people())
+        self.assertTrue(before > 0)
+
+        # 模拟「启动时读到空列表」的状态
+        self.api.people = []
+        self.api.refresh_schedules()
+
+        with open(self.api.data_path, encoding="utf-8") as handle:
+            after = len(json.load(handle).get("people", []))
+        self.assertEqual(after, before, "磁盘上的人员不能被空内存覆盖")
+
     def test_swap_rejects_unknown_week(self):
         result = self.api.swap_duty(9, 1, 0, "member", "M0")
         self.assertFalse(result["ok"])

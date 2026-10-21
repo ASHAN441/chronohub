@@ -32,7 +32,8 @@
     *, *::before, *::after{ box-sizing:border-box; }
 
     .win-titlebar{ display:flex; align-items:stretch; height:36px; flex:none; background:var(--win-surface); border-bottom:1px solid var(--win-border); user-select:none; }
-    .win-titlebar-left{ display:flex; align-items:center; gap:9px; padding-left:12px; min-width:0; }
+    .win-titlebar-left{ display:flex; align-items:center; gap:9px; padding-left:12px; min-width:0;
+      flex:1; cursor:default; }
     .win-logo{ width:18px; height:18px; border-radius:4px; background:var(--win-accent); color:var(--win-accent-fg); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; }
     .win-title{ font-size:12px; color:var(--win-text-muted); white-space:nowrap; }
     .win-controls{ margin-left:auto; display:flex; flex:none; }
@@ -446,7 +447,9 @@
     <div class="splash-bar"><i></i></div>
   </div>
   <div class="win-titlebar">
-    <div class="win-titlebar-left">
+    <!-- pywebview-drag-region：无边框窗口靠它拖动。只包标题这一块，
+         不含右侧按钮，避免点最小化时变成拖窗口 -->
+    <div class="win-titlebar-left pywebview-drag-region">
       <span class="win-logo">时</span>
       <span class="win-title">时枢 ChronoHub</span>
       <span class="win-version" id="app-version"></span>

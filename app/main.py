@@ -102,6 +102,13 @@ def _run() -> None:
         width=1280,
         height=800,
         min_size=(1080, 660),
+        # 界面里已经画了自己的标题栏（含最小化/最大化/关闭，按钮都接到了 API），
+        # 不关掉系统标题栏就会上下两条。
+        # easy_drag 必须是 False：它让"整个窗口随便拖都能移动"，
+        # 会和侧边栏「拖动人员调整分组」的 HTML5 拖拽打架。
+        # 拖动改由 .pywebview-drag-region（标题栏左侧那条）负责。
+        frameless=True,
+        easy_drag=False,
     )
     api._window = window
     _boot_log("窗口对象已创建")

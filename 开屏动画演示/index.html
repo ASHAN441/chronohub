@@ -10,7 +10,8 @@
        font-display:block —— 开屏宁可等字体也别先闪一下回退字形。 */
     @font-face{
       font-family:'ChronoHub Display';
-      src:url('../web/assets/fonts/bahnschrift.ttf') format('truetype');
+      src:url('../web/assets/fonts/smiley-sans.ttf') format('truetype');
+      /* 得意黑是单字重字体，但声明范围避免浏览器合成假粗体 */
       font-weight:100 900;
       font-style:normal;
       font-display:block;
@@ -54,11 +55,11 @@
   }
   .line{ display:flex; align-items:baseline; gap:16px; }
   .w{
-    color:#fff; font-size:31px; font-weight:600; letter-spacing:.16em;
-    font-family:'ChronoHub Display', Bahnschrift, "Segoe UI Semibold", "Segoe UI", sans-serif;
+    color:#fff; font-size:40px; font-weight:600; letter-spacing:.12em;
+    font-family:'ChronoHub Display', "Smiley Sans", "Segoe UI Semibold", sans-serif;
     opacity:0; transform:translateY(10px);
     /* 让 letter-spacing 右侧不额外撑开，视觉更居中 */
-    margin-right:-.16em;
+    margin-right:-.12em;
   }
   .rule{
     width:0; height:1px; background:rgba(255,255,255,.38);

@@ -5,10 +5,15 @@
     python -m PyInstaller packaging/ChronoHub.spec --noconfirm --clean
 
 产出：
-    dist/ChronoHub.exe     单文件版（onefile）
+    dist/ChronoHub/        文件夹版（onedir）
+      ChronoHub.exe
+      _internal/           PySide6 / QtWebEngine / web / 模板 都在这里
+      data/                运行时生成（账号、人员、值班表、日志）
 
-为什么用 onefile：便于直接发给别人，双击即用。
-代价是每次启动要把 PySide6 + QtWebEngine 解压到临时目录，首次启动偏慢。
+为什么改 onedir：onefile 每次启动都要把 242MB 解压到临时目录，
+实测「双击 → 窗口出现」要 16 秒，其中 15 秒全在解压。
+onedir 没有这一步，启动直接降到几秒。
+代价：分发的是一个文件夹（要整体压缩或整个目录拷走），不再是一个 exe。
 
 注意点
 ------
@@ -89,9 +94,8 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
+    exclude_binaries=True,   # 依赖交给下面的 COLLECT 收拾，onenfile 改 onedir 的关键
     name=APP_NAME,
     debug=False,
     bootloader_ignore_signals=False,
@@ -107,4 +111,15 @@ exe = EXE(
     entitlements_file=None,
     icon=ICON,
     splash=splash,
+)
+
+# onedir 的产物收集：所有二进制与数据都放进来，输出 dist/ChronoHub/
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name=APP_NAME,
 )

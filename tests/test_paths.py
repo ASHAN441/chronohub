@@ -92,6 +92,18 @@ class ResourceLayoutTest(unittest.TestCase):
         self.assertIn('"web"', content, "spec 必须把 web/ 作为数据一起打包")
         self.assertIn("console=False", content, "窗口程序不应留控制台")
 
+    def test_spec_builds_onedir_folder(self):
+        """必须是文件夹版（onedir）。
+
+        onefile 每次启动都要把 242MB 解压到临时目录，实测「双击→窗口」16 秒；
+        换 onedir 后 2.4~3.1 秒。别为了"一个 exe 好发"把这条又改回去。
+        """
+        spec = os.path.join(ROOT, "packaging", "ChronoHub.spec")
+        with open(spec, encoding="utf-8") as handle:
+            content = handle.read()
+        self.assertIn("exclude_binaries=True", content, "EXE 必须把依赖交给 COLLECT")
+        self.assertIn("COLLECT(", content, "目录版必须用 COLLECT 收集产物")
+
     def test_spec_has_boot_splash(self):
         """打包启动图要打进 exe —— 它负责盖住「解压」那段黑屏。"""
         spec = os.path.join(ROOT, "packaging", "ChronoHub.spec")

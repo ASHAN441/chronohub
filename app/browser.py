@@ -277,6 +277,12 @@ class EmbeddedBrowser(QObject):
         if self._host is None or self._container is None:
             return
         self._container.setGeometry(0, 0, self._host.width(), self._host.height())
+        # 容器开着的时候，别让应用自己的网页视图偷偷回来（窗口缩放、状态刷新
+        # 都可能把它重新显示出来，一旦回来就又是两个视图叠在一起）
+        if self._container.isVisible():
+            app_view = self._app_view()
+            if app_view is not None and app_view.isVisible():
+                app_view.hide()
 
     def _refresh_status_label(self) -> None:
         """把当前状态显示到内嵌页面的工具条上。"""
@@ -302,17 +308,41 @@ class EmbeddedBrowser(QObject):
     # 显示 / 隐藏
     # ------------------------------------------------------------------
 
+    def _app_view(self):
+        """应用自己的那个网页视图（pywebview 的 WebView）。"""
+        if self._host is None:
+            return None
+        try:
+            central = self._host.centralWidget()
+        except Exception:  # noqa: BLE001
+            return None
+        return central
+
     def show(self) -> None:
         if not self._ensure_embedded():
             return
         self._sync_geometry()
+        # 关键：把应用自己的网页视图藏起来，让画面上同一时刻只有一个
+        # QWebEngineView。两个原生网页控件叠在一起时，Qt 的控件层级和
+        # 原生窗口层级可能不一致 —— 看到的是上面那个、点到的是下面那个，
+        # 表现就是「页面显示正常但怎么点都没反应」。
+        app_view = self._app_view()
+        if app_view is not None:
+            app_view.hide()
         self._container.show()
         self._container.raise_()
+        if self._view is not None:
+            self._view.setFocus()
         self._set(open=True, error="")
 
     def hide(self) -> None:
         if self._container is not None:
             self._container.hide()
+        app_view = self._app_view()
+        if app_view is not None:
+            app_view.show()
+            app_view.raise_()
+            app_view.setFocus()
         self._set(open=False)
 
     def open_page(self, url: str = "") -> None:

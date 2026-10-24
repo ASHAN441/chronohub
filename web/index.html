@@ -63,6 +63,11 @@
     .tb-sep{ width:1px; height:20px; background:var(--win-border); margin:0 2px; }
     .tb-field{ display:inline-flex; align-items:center; gap:7px; color:var(--win-text-muted); font-size:12px; }
     .tb-select{ font-family:inherit; font-size:13px; height:30px; padding:0 8px; border-radius:5px; border:1px solid var(--win-border); background:var(--win-surface); color:var(--win-text); }
+    /* 教务系统地址：可以自己填，所以是输入框而不是下拉（datalist 给预设提示） */
+    .tb-input{ font-family:inherit; font-size:12.5px; height:30px; width:330px; padding:0 9px; border-radius:5px;
+      border:1px solid var(--win-border); background:var(--win-surface); color:var(--win-text); }
+    .tb-input:focus{ outline:none; border-color:var(--win-accent);
+      box-shadow:0 0 0 2px color-mix(in srgb, var(--win-accent) 20%, transparent); }
     .tb-spacer{ flex:1; }
     .tb-info{ font-size:12px; color:var(--win-text-muted); }
     .tb-info strong{ color:var(--win-text); font-weight:600; }
@@ -677,8 +682,12 @@
             <select class="tb-select" id="browser-account"></select>
           </label>
           <label class="tb-field">系统地址
-            <select class="tb-select" id="browser-url"></select>
+            <input class="tb-input" id="browser-url" list="browser-url-presets"
+                   placeholder="jwxt.synu.edu.cn/jwglxt/xtgl/login_slogin.html"
+                   spellcheck="false" autocomplete="off">
+            <datalist id="browser-url-presets"></datalist>
           </label>
+          <button class="tb-btn" id="browser-url-save" type="button">保存地址</button>
           <button class="tb-btn primary" id="browser-login" type="button">打开并登录</button>
           <button class="tb-btn" id="browser-export" type="button">导出课表 PDF</button>
           <span class="tb-sep"></span>
@@ -3097,7 +3106,29 @@
         }
       }
 
-      function browserLogin(){
+      /* 保存教务系统地址：自己填的地址也存进账号库，重启后还在。
+         留空 = 恢复默认地址。 */
+      async function saveSystemUrl(){
+        var input = document.getElementById('browser-url');
+        if(!input) return;
+        if(!isDesktop()){ showToast('浏览器预览模式无法保存地址'); return; }
+        var value = (input.value || '').trim();
+        try {
+          var res = await window.pywebview.api.set_login_url(value);
+          if(!res || res.ok === false){
+            showToast('地址无效：' + ((res && res.error) || '未知错误'));
+            input.value = browserState.current || '';     // 回滚到上一次保存的值
+            return;
+          }
+          browserState.current = res.current || '';
+          input.value = browserState.current;              // 显示服务端规整后的样子（比如补上的 http://）
+          showToast(value ? '地址已保存' : '已恢复默认地址');
+        } catch(e) {
+          showToast('保存失败：' + (e && e.message ? e.message : e));
+        }
+      }
+
+      async function browserLogin(){
         var sel = document.getElementById('browser-account');
         var a = sel.value ? accountById(Number(sel.value)) : null;
         if(!a){ showToast('请先添加并选择一个账号'); return; }
@@ -3105,8 +3136,14 @@
           showToast('预览模式下无法打开内嵌浏览器，请用 启动.bat 运行程序后再试');
           return;
         }
-        var url = document.getElementById('browser-url').value;
-        if(url) window.pywebview.api.set_login_url(url).catch(function(){});
+        // 输入框里可能是刚改还没保存的地址：先存一次，顺便让后端校验
+        var typed = (document.getElementById('browser-url').value || '').trim();
+        var saved = await window.pywebview.api.set_login_url(typed).catch(function(){ return null; });
+        if(saved && saved.ok === false){
+          showToast('地址无效：' + (saved.error || '未知错误'));
+          return;
+        }
+        if(saved && saved.current) document.getElementById('browser-url').value = saved.current;
         window.pywebview.api.browser_login(a.id).then(function(res){
           if(res && res.ok === false){ showToast('登录失败：' + (res.error || '未知错误')); return; }
           showToast('正在打开浏览器并登录「' + a.nickname + '」…');
@@ -3162,11 +3199,14 @@
         return window.pywebview.api.get_system_urls().then(function(info){
           browserState.urls = (info && info.urls) || [];
           browserState.current = (info && info.current) || '';
-          var sel = document.getElementById('browser-url');
-          sel.innerHTML = browserState.urls.map(function(u){
-            return '<option value="' + esc(u.url) + '">' + esc(u.label) + ' · ' + esc(u.url) + '</option>';
-          }).join('');
-          if(browserState.current) sel.value = browserState.current;
+          var list = document.getElementById('browser-url-presets');
+          if(list){
+            list.innerHTML = browserState.urls.map(function(u){
+              return '<option value="' + esc(u.url) + '">' + esc(u.label) + '</option>';
+            }).join('');
+          }
+          var input = document.getElementById('browser-url');
+          if(input && browserState.current) input.value = browserState.current;
           renderBrowserAccounts();
         }).catch(function(){});
       }
@@ -3224,9 +3264,10 @@
         document.getElementById('browser-export').addEventListener('click', browserExport);
         document.getElementById('browser-hide').addEventListener('click', browserHide);
         document.getElementById('browser-logout').addEventListener('click', browserLogout);
-        document.getElementById('browser-url').addEventListener('change', function(){
-          browserState.current = this.value;
-          if(isDesktop()) window.pywebview.api.set_login_url(this.value).catch(function(){});
+        document.getElementById('browser-url').addEventListener('change', saveSystemUrl);
+        document.getElementById('browser-url-save').addEventListener('click', saveSystemUrl);
+        document.getElementById('browser-url').addEventListener('keydown', function(e){
+          if(e.key === 'Enter'){ e.preventDefault(); saveSystemUrl(); }
         });
         document.getElementById('goto-freetime').addEventListener('click', function(){ switchView('freetime'); });
       }

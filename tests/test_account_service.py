@@ -141,6 +141,69 @@ class ApiAccountBridgeTest(unittest.TestCase):
             "http://10.0.0.1/jwglxt/login_slogin.html",
         )
 
+    def test_login_url_is_validated(self):
+        """地址要校验：粘贴错了不能默默存下来。
+
+        以前不做校验，存了个「随便写的」之后点「打开并登录」只会得到空白页。
+        """
+        before = self.api.get_system_urls()["current"]
+
+        result = self.api.set_login_url("ftp://example.com/x")
+        self.assertFalse(result["ok"])
+        self.assertIn("http", result["error"])
+        self.assertEqual(self.api.get_system_urls()["current"], before, "失败时不该改动已存的地址")
+
+        result = self.api.set_login_url("随便写的")
+        self.assertFalse(result["ok"])
+        self.assertIn("主机名", result["error"])
+
+    def test_login_url_gets_scheme_added(self):
+        """只写域名的话自动补 http://，并原样返回给前端显示。"""
+        result = self.api.set_login_url("jwxt.example.edu.cn/jwglxt/xtgl/login_slogin.html")
+        self.assertTrue(result["ok"])
+        self.assertEqual(
+            result["current"],
+            "http://jwxt.example.edu.cn/jwglxt/xtgl/login_slogin.html",
+        )
+
+    def test_login_url_can_be_reset(self):
+        """留空 = 恢复默认地址（默认地址来自 system_urls.DEFAULT_LOGIN_URL）。"""
+        self.api.set_login_url("http://10.0.0.1/login")
+        result = self.api.set_login_url("")
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["current"].startswith("http"))
+        self.assertNotEqual(result["current"], "http://10.0.0.1/login")
+
+
+class NormalizeLoginUrlTest(unittest.TestCase):
+    """地址规整的纯函数测试（不碰数据库）。"""
+
+    def test_normalize(self):
+        from app.system_urls import normalize_login_url
+
+        ok, value, _ = normalize_login_url("https://jwxt.synu.edu.cn/jwglxt/xtgl/login_slogin.html")
+        self.assertTrue(ok)
+        self.assertEqual(value, "https://jwxt.synu.edu.cn/jwglxt/xtgl/login_slogin.html")
+
+        ok, value, _ = normalize_login_url("  jwxt.synu.edu.cn/jwglxt/xtgl/login_slogin.html  ")
+        self.assertTrue(ok)
+        self.assertTrue(value.startswith("http://"), "没写协议要自动补 http://")
+
+        ok, value, _ = normalize_login_url("http://192.168.186.200/jwglxt/xtgl/login_slogin.html")
+        self.assertTrue(ok)
+
+        ok, _, error = normalize_login_url("ftp://example.com/x")
+        self.assertFalse(ok)
+        self.assertIn("http", error)
+
+        ok, _, error = normalize_login_url("随便写的")
+        self.assertFalse(ok)
+        self.assertIn("主机名", error)
+
+        ok, value, _ = normalize_login_url("")
+        self.assertTrue(ok)
+        self.assertEqual(value, "", "空串表示跟随默认")
+
 
 class CrossThreadTest(unittest.TestCase):
     """账号库必须支持跨线程访问。

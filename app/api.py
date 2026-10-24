@@ -44,7 +44,7 @@ from .specials_store import (
     normalize as normalize_special,
     save_specials,
 )
-from .system_urls import DEFAULT_LOGIN_URL, SYSTEM_URLS
+from .system_urls import DEFAULT_LOGIN_URL, SYSTEM_URLS, normalize_login_url
 
 
 # 无边框窗口的可拖拽边缘 → 组合成 Qt 的 Edges
@@ -1119,10 +1119,23 @@ class Api:
         }
 
     def set_login_url(self, url: str) -> dict:
-        self.accounts.set_login_url(url or "")
+        """保存教务系统地址。空字符串表示恢复默认。
+
+        以前这里不做校验，粘贴错了也照存，结果点「打开并登录」只会得到一个空白页；
+        现在先把地址规整一遍，不合法的直接告诉用户哪里不对。
+        """
+        ok, normalized, error = normalize_login_url(url)
+        if not ok:
+            return {
+                "ok": False,
+                "error": error,
+                "current": self.accounts.get_login_url(DEFAULT_LOGIN_URL),
+            }
+        self.accounts.set_login_url(normalized)
         return {
             "ok": True,
             "current": self.accounts.get_login_url(DEFAULT_LOGIN_URL),
+            "normalized": normalized,
         }
 
     # ============ 课表导出（内嵌浏览器 + 导出后自动入库） ============

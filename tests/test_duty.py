@@ -395,6 +395,8 @@ class ApiDutyTest(unittest.TestCase):
         self.assertTrue(result.get("need_confirm"), "应该返回 need_confirm 而不是直接失败")
         self.assertEqual(result["times"], 1)
         self.assertIn("已经排过", result["error"])
+        # 前端要用 name/times 拼短句（弹窗文案不该由后端决定）
+        self.assertTrue(result.get("name"), "要带上是哪个人的名字")
 
         # 确认后（force=True）：真的排上，这个人一周占两个班次
         forced = self.api.swap_duty(

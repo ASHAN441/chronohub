@@ -4135,10 +4135,9 @@
           var res = await window.pywebview.api.swap_duty(
             roster.week, day, block, role, personKey, !!force);
           if(res && res.need_confirm){
-            var total = (res.times || 1) + 1;
-            openConfirm('这个人本周已经排过班',
-              (res.error || '') + '。再排一次，他这周就是 ' + total +
-              ' 个班次了。\n\n自动排班保证每人每周只排 1 次，这里是手动调整，确定要排吗？',
+            var already = res.times || 1;
+            openConfirm((res.name || '这个人') + '本周已排 ' + already + ' 次',
+              '再排就是 ' + (already + 1) + ' 个班次，确定吗？',
               function(){ doDutySwap(day, block, role, personKey, true); });
             return;
           }

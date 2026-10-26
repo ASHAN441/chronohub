@@ -912,12 +912,15 @@ class Api:
                 and not (item["day"] == day and item["block"] == block)
             )
             if already and not force:
+                name = target.get("name") or person_key
                 return {
                     "ok": False,
                     "need_confirm": True,
                     "times": already,
-                    "error": "「%s」本周已经排过 %d 次班" % (
-                        target.get("name") or person_key, already),
+                    "name": name,
+                    # error 是给日志 / 非界面场景用的完整句子；
+                    # 弹窗文案由前端按 name/times 自己拼短句，别把长句丢给用户。
+                    "error": "「%s」本周已经排过 %d 次班" % (name, already),
                 }
 
             slot["person"] = person_key

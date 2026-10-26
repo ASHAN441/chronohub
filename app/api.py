@@ -547,6 +547,63 @@ class Api:
     # 按周存：一张表 = 某一周的全部班次。重新生成同一周会覆盖。
     # 「值了几次班」= 所有已存值班表的汇总，永远和实际排班一致。
 
+    def _group_scope(self, name: str) -> set:
+        """选中的分组 → 它自己 + 所有下级分组。
+
+        分组是树形的（部员 → 技术传媒中心 …），排班要支持「选父级 = 整棵树」，
+        否则像「部员」这种自己名下没人、只当容器的分组，在界面上根本没法选。
+        """
+        name = (name or "").strip()
+        if not name:
+            return set()
+        scope = {name}
+        changed = True
+        while changed:
+            changed = False
+            for group in self.groups or []:
+                gname = (group.get("name") or "").strip()
+                parent = (group.get("parent") or "").strip()
+                if gname and parent and parent in scope and gname not in scope:
+                    scope.add(gname)
+                    changed = True
+        return scope
+
+    def _group_tree(self, group_of: dict) -> list:
+        """分组层级列表，给排班的分组下拉用。
+
+        total 是「整棵子树」的人数——直接告诉用户选这一项会影响多少人。
+        还带上了「人员分组里有、但分组树里没有」的历史数据，避免选不到人。
+        """
+        direct = {}
+        for group_name in (group_of or {}).values():
+            if group_name:
+                direct[group_name] = direct.get(group_name, 0) + 1
+
+        tree = []
+        seen = set()
+
+        def walk(parent, depth):
+            for group in self.groups or []:
+                if (group.get("parent") or "").strip() != parent:
+                    continue
+                name = (group.get("name") or "").strip()
+                if not name or name in seen:
+                    continue
+                seen.add(name)
+                total = sum(direct.get(g, 0) for g in self._group_scope(name))
+                tree.append({
+                    "name": name, "parent": parent, "depth": depth,
+                    "direct": direct.get(name, 0), "total": total,
+                })
+                walk(name, depth + 1)
+
+        walk("", 0)
+        for name, count in direct.items():
+            if name not in seen and name != "未分组":
+                tree.append({"name": name, "parent": "", "depth": 0,
+                             "direct": count, "total": count})
+        return tree
+
     def get_duty(self) -> dict:
         with self._people_lock:
             rosters = [json.loads(json.dumps(r)) for r in self.rosters]
@@ -578,6 +635,7 @@ class Api:
             "names": names,
             "groups": group_of,
             "group_names": sorted({g for g in group_of.values() if g}),
+            "group_tree": self._group_tree(group_of),
             "has_template": bool(template_path()),
         }
 
@@ -641,7 +699,12 @@ class Api:
 
         # 排除当前这一周的历史计数：重排同一周时不该让已排的人轮空
         totals = count_assignments(existing, exclude_week=week)
-        assignments, _ = generate_roster(people, specials, week, groups or {}, totals)
+        # 选父级分组 = 它下面所有分组一起参与排班
+        scope = {
+            role: self._group_scope((groups or {}).get(role) or "")
+            for role in ("member", "minister")
+        }
+        assignments, _ = generate_roster(people, specials, week, scope, totals)
 
         # 「本周这个时段不用人值班」是用户手动标的，重排这一周时要保住，
         # 并且被标记的班次上不排人（否则会出现"有人值班但标了不用"）。
@@ -705,8 +768,10 @@ class Api:
         if slot is None:
             return {"candidates": []}
 
+        selected = (roster.get("groups") or {}).get(role) or ""
+        scope = {role: self._group_scope(selected)}
         keys = swap_candidates(
-            people, specials, week, roster.get("groups") or {},
+            people, specials, week, scope,
             role, slot["day"], slot["start"], slot["end"], used,
         )
         names = {}
@@ -815,7 +880,7 @@ class Api:
                 return {"ok": False, "error": "没有这个人"}
 
             role_group = (roster.get("groups") or {}).get(expected)
-            if role_group and (target.get("group") or "") != role_group:
+            if role_group and (target.get("group") or "") not in self._group_scope(role_group):
                 return {"ok": False, "error": f"这个人不在「{role_group}」分组里"}
 
             if is_busy(target, specials, person_key, day, slot["start"], slot["end"], week):

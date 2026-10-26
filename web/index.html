@@ -388,6 +388,9 @@
     .duty-table td{ cursor:pointer; position:relative; }
     .duty-table td:hover{ outline:1px solid var(--win-accent); outline-offset:-1px; }
     .duty-name{ font-weight:500; }
+    /* 人名下方的分组名：灰、小一号，一眼能看出这人属于哪个中心 */
+    .duty-group{ display:block; font-size:10.5px; color:var(--win-text-muted); margin-top:1px; }
+    .duty-dual .duty-group{ font-size:10.5px; color:var(--win-text-muted); }
     .duty-cell-meta{ display:block; font-size:10.5px; color:var(--win-text-muted); margin-top:1px; }
     .duty-table td.open{ background:color-mix(in srgb, #c42b1c 12%, var(--win-surface)); color:#c42b1c; font-weight:600; }
     .duty-table td.open .duty-cell-meta{ color:color-mix(in srgb, #c42b1c 70%, var(--win-text-muted)); }
@@ -3656,14 +3659,22 @@
         if(current) sel.value = current;
       }
 
-      function fillDutyGroupSelect(id, names, preferred){
+      /* 分组下拉：列出整棵树，子级用全角空格缩进，右边标「该组含下级共几人」。
+         可选父级是关键——像「部员」这种只当容器、自己名下没人的分组，
+         以前用「有人的分组」列表时根本选不到。 */
+      function fillDutyGroupSelect(id, tree, preferred){
         var sel = document.getElementById(id);
-        if(!names.length){
+        if(!tree || !tree.length){
           sel.innerHTML = '<option value="">（没有分组）</option>';
           return;
         }
-        sel.innerHTML = names.map(function(n){
-          return '<option value="' + esc(n) + '">' + esc(n) + '</option>';
+        var names = [];
+        sel.innerHTML = tree.map(function(g){
+          names.push(g.name);
+          var indent = '';
+          for(var i = 0; i < (g.depth || 0); i++) indent += '\u3000';
+          var label = indent + g.name + '（' + g.total + ' 人）';
+          return '<option value="' + esc(g.name) + '">' + esc(label) + '</option>';
         }).join('');
         sel.value = names.indexOf(preferred) !== -1 ? preferred : names[0];
       }
@@ -3691,9 +3702,9 @@
         dutyState.loaded = true;
 
         // 分组下拉：用真实存在的分组名，默认猜 部员/部长
-        var names = (dutyState.data.group_names || []).slice();
-        fillDutyGroupSelect('duty-member-group', names, prev.member || '部员');
-        fillDutyGroupSelect('duty-minister-group', names, prev.minister || '部长');
+        var tree = dutyState.data.group_tree || [];
+        fillDutyGroupSelect('duty-member-group', tree, prev.member || '部员');
+        fillDutyGroupSelect('duty-minister-group', tree, prev.minister || '部长');
         renderDuty();
       }
 
@@ -3715,6 +3726,11 @@
           if(r.week === week) found = r;
         });
         return found;
+      }
+
+      function dutyPersonGroup(key){
+        var map = (dutyState.data && dutyState.data.groups) || {};
+        return map[key] || '';
       }
 
       function dutyPersonName(key){
@@ -3772,7 +3788,7 @@
             } else {
               html += '<td data-day="' + day + '" data-block="' + bi + '">' +
                       '<span class="duty-name">' + esc(dutyPersonName(item.person)) + '</span>' +
-                      '<span class="duty-cell-meta">' + dutyCountOf(item.person) + ' 次</span></td>';
+                      '<span class="duty-group">' + esc(dutyPersonGroup(item.person)) + '</span></td>';
             }
           }
           html += '</tr>';
@@ -3795,6 +3811,8 @@
                   '<div class="duty-dual">' +
                     '<span><span class="role">部长</span>' +
                       (minister ? esc(dutyPersonName(minister)) : '<b style="color:#c42b1c">缺</b>') + '</span>' +
+                    (minister && dutyPersonGroup(minister) && dutyPersonGroup(minister) !== '部长'
+                      ? '<span class="duty-group">' + esc(dutyPersonGroup(minister)) + '</span>' : '') +
                   '</div></td>';
         }
         html += '</tr>';

@@ -77,6 +77,20 @@ def build_slots() -> list:
     return slots
 
 
+def group_scope(value) -> set:
+    """把「选中的分组」统一成一个名字集合。
+
+    选父级分组时，调用方传进来的是「整棵子树」的名字集合；
+    选叶子或者只有一个组时传进来的就是普通字符串。
+    两种都要支持，排班逻辑才不用关心选的是哪一级。
+    """
+    if not value:
+        return set()
+    if isinstance(value, str):
+        return {value.strip()} if value.strip() else set()
+    return {str(item).strip() for item in value if str(item).strip()}
+
+
 def generate_roster(person_dicts, specials, week, groups, totals, rng=None):
     """排一张值班表。
 
@@ -96,11 +110,11 @@ def generate_roster(person_dicts, specials, week, groups, totals, rng=None):
 
     pools = {}
     for role in ("member", "minister"):
-        name = (groups or {}).get(role) or ""
+        scope = group_scope((groups or {}).get(role))
         pools[role] = [
             p for p in person_dicts or []
-            if name and (p.get("group") or "") == name and person_key(p)
-        ] if name else []
+            if scope and (p.get("group") or "") in scope and person_key(p)
+        ]
 
     used = set()
 
@@ -145,15 +159,15 @@ def generate_roster(person_dicts, specials, week, groups, totals, rng=None):
 
 def swap_candidates(person_dicts, specials, week, groups, role, day, start, end, used_keys):
     """某班次可替换的人（当时有空 + 本周未被排）。"""
-    name = (groups or {}).get(role) or ""
-    if not name:
+    scope = group_scope((groups or {}).get(role))
+    if not scope:
         return []
     out = []
     for person in person_dicts or []:
         key = person_key(person)
         if not key or key in used_keys:
             continue
-        if (person.get("group") or "") != name:
+        if (person.get("group") or "") not in scope:
             continue
         if is_busy(person, specials, key, day, start, end, week):
             continue

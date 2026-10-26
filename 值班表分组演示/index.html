@@ -523,7 +523,7 @@ body{ display:flex; flex-direction:column; height:100vh; }
 
 <div class="demo-bar">
   <b>界面演示</b>
-  <span>① 分组下拉可以选上一级（选「部员」= 它下面所有中心）　② 值班单元格里的人名下方显示分组</span>
+  <span>① 分组下拉可以选上一级（选「部员」= 它下面所有中心）　② 值班单元格里只显示「人名 + 分组」，不显示次数</span>
 </div>
 
 <div class="stage">
@@ -575,35 +575,35 @@ body{ display:flex; flex-direction:column; height:100vh; }
       <tbody>
         <tr>
           <th>第1-2节<br><span style="font-size:10.5px">部员</span></th>
-          <td><span class="duty-name">张明</span><span class="duty-group">技术传媒中心</span><span class="duty-sub">2 次</span></td>
-          <td><span class="duty-name">李欣</span><span class="duty-group">行政事务中心</span><span class="duty-sub">1 次</span></td>
-          <td><span class="duty-name">王浩然</span><span class="duty-group">网络传播中心</span><span class="duty-sub">3 次</span></td>
-          <td><span class="duty-name">陈思</span><span class="duty-group">新闻综合频道</span><span class="duty-sub">0 次</span></td>
-          <td><span class="duty-name">刘洋</span><span class="duty-group">娱乐综艺频道</span><span class="duty-sub">2 次</span></td>
+          <td><span class="duty-name">张明</span><span class="duty-group">技术传媒中心</span></td>
+          <td><span class="duty-name">李欣</span><span class="duty-group">行政事务中心</span></td>
+          <td><span class="duty-name">王浩然</span><span class="duty-group">网络传播中心</span></td>
+          <td><span class="duty-name">陈思</span><span class="duty-group">新闻综合频道</span></td>
+          <td><span class="duty-name">刘洋</span><span class="duty-group">娱乐综艺频道</span></td>
         </tr>
         <tr>
           <th>第3-4节<br><span style="font-size:10.5px">部员</span></th>
-          <td><span class="duty-name">赵一</span><span class="duty-group">校园文化频道</span><span class="duty-sub">1 次</span></td>
-          <td><span class="duty-name">孙悦</span><span class="duty-group">技术传媒中心</span><span class="duty-sub">4 次</span></td>
-          <td><span class="duty-name">周涛</span><span class="duty-group">新闻综合频道</span><span class="duty-sub">1 次</span></td>
-          <td><span class="duty-name">吴迪</span><span class="duty-group">行政事务中心</span><span class="duty-sub">0 次</span></td>
-          <td><span class="duty-name">郑洁</span><span class="duty-group">网络传播中心</span><span class="duty-sub">2 次</span></td>
+          <td><span class="duty-name">赵一</span><span class="duty-group">校园文化频道</span></td>
+          <td><span class="duty-name">孙悦</span><span class="duty-group">技术传媒中心</span></td>
+          <td><span class="duty-name">周涛</span><span class="duty-group">新闻综合频道</span></td>
+          <td><span class="duty-name">吴迪</span><span class="duty-group">行政事务中心</span></td>
+          <td><span class="duty-name">郑洁</span><span class="duty-group">网络传播中心</span></td>
         </tr>
         <tr>
           <th>第5-6节<br><span style="font-size:10.5px">部员</span></th>
-          <td><span class="duty-name">冯雪</span><span class="duty-group">娱乐综艺频道</span><span class="duty-sub">1 次</span></td>
-          <td><span class="duty-name">何伟</span><span class="duty-group">技术传媒中心</span><span class="duty-sub">2 次</span></td>
+          <td><span class="duty-name">冯雪</span><span class="duty-group">娱乐综艺频道</span></td>
+          <td><span class="duty-name">何伟</span><span class="duty-group">技术传媒中心</span></td>
           <td class="duty-off">不用人<span class="duty-cell-meta">点此恢复</span></td>
-          <td><span class="duty-name">许静</span><span class="duty-group">校园文化频道</span><span class="duty-sub">3 次</span></td>
-          <td><span class="duty-name">沈磊</span><span class="duty-group">新闻综合频道</span><span class="duty-sub">0 次</span></td>
+          <td><span class="duty-name">许静</span><span class="duty-group">校园文化频道</span></td>
+          <td><span class="duty-name">沈磊</span><span class="duty-group">新闻综合频道</span></td>
         </tr>
         <tr>
           <th>第7-8节<br><span style="font-size:10.5px">部员</span></th>
-          <td><span class="duty-name">韩雨</span><span class="duty-group">网络传播中心</span><span class="duty-sub">1 次</span></td>
-          <td><span class="duty-name">杨帆</span><span class="duty-group">行政事务中心</span><span class="duty-sub">2 次</span></td>
-          <td><span class="duty-name">朱琳</span><span class="duty-group">技术传媒中心</span><span class="duty-sub">0 次</span></td>
-          <td><span class="duty-name">秦朗</span><span class="duty-group">娱乐综艺频道</span><span class="duty-sub">1 次</span></td>
-          <td><span class="duty-name">尤佳</span><span class="duty-group">校园文化频道</span><span class="duty-sub">2 次</span></td>
+          <td><span class="duty-name">韩雨</span><span class="duty-group">网络传播中心</span></td>
+          <td><span class="duty-name">杨帆</span><span class="duty-group">行政事务中心</span></td>
+          <td><span class="duty-name">朱琳</span><span class="duty-group">技术传媒中心</span></td>
+          <td><span class="duty-name">秦朗</span><span class="duty-group">娱乐综艺频道</span></td>
+          <td><span class="duty-name">尤佳</span><span class="duty-group">校园文化频道</span></td>
         </tr>
         <tr>
           <th>第9-10节<br><span style="font-size:10.5px">部长</span></th>
@@ -618,7 +618,7 @@ body{ display:flex; flex-direction:column; height:100vh; }
   </div>
 
   <div class="note">
-    单元格现在是三行：<b>人名</b> / 分组（灰） / 累计次数（更淡）。如果觉得太挤，也可以把分组和次数并成一行「技术传媒中心 · 2 次」——说一声我改。
+    单元格是两行：<b>人名</b> / 分组（灰）。累计次数不在格子里显示，仍在右侧人员列表里看和调整。
   </div>
 
 </div>

@@ -408,6 +408,57 @@ class ApiDutyTest(unittest.TestCase):
         roster = [r for r in payload["rosters"] if r["week"] == 1][0]
         self.assertNotIn([1, 0], roster["off"])
 
+    def test_parent_group_covers_children(self):
+        """选父级分组（部员）时，它下面各中心的人都要参与排班。
+
+        以前的分组下拉只能选「有人的」叶子分组，像「部员」这种只当容器、
+        自己名下没人的父级根本选不到。
+        """
+        from app.models import Person
+
+        self.api.groups = [
+            {"name": "部员", "parent": ""},
+            {"name": "技术传媒中心", "parent": "部员"},
+            {"name": "行政事务中心", "parent": "部员"},
+            {"name": "部长", "parent": ""},
+        ]
+        self.api.people = (
+            [Person(name=f"技术{i}", student_id=f"T{i}", group="技术传媒中心") for i in range(10)]
+            + [Person(name=f"行政{i}", student_id=f"X{i}", group="行政事务中心") for i in range(10)]
+            + [Person(name=f"部长{i}", student_id=f"N{i}", group="部长") for i in range(6)]
+        )
+
+        payload = self.api.generate_duty(1, {"member": "部员", "minister": "部长"})
+        self.assertTrue(payload.get("ok"), payload)
+
+        roster = [r for r in payload["rosters"] if r["week"] == 1][0]
+        used = {a["person"] for a in roster["assignments"] if a.get("person")}
+        self.assertTrue(any(k.startswith("T") for k in used), "技术传媒中心的人应该参与排班")
+        self.assertTrue(any(k.startswith("X") for k in used), "行政事务中心的人应该参与排班")
+
+        # 排班表里存的还是「选中的那个组名」，不是展开后的集合
+        self.assertEqual(roster["groups"]["member"], "部员")
+
+    def test_group_tree_reports_subtree_counts(self):
+        """分组下拉要带层级和「整棵子树人数」。"""
+        from app.models import Person
+
+        self.api.groups = [
+            {"name": "部员", "parent": ""},
+            {"name": "技术传媒中心", "parent": "部员"},
+            {"name": "行政事务中心", "parent": "部员"},
+        ]
+        self.api.people = (
+            [Person(name=f"技术{i}", student_id=f"T{i}", group="技术传媒中心") for i in range(10)]
+            + [Person(name=f"行政{i}", student_id=f"X{i}", group="行政事务中心") for i in range(5)]
+        )
+
+        tree = {g["name"]: g for g in self.api.get_duty()["group_tree"]}
+        self.assertEqual(tree["部员"]["total"], 15, "父级人数 = 整棵子树")
+        self.assertEqual(tree["部员"]["direct"], 0, "父级自己名下没人")
+        self.assertEqual(tree["技术传媒中心"]["total"], 10)
+        self.assertEqual(tree["技术传媒中心"]["depth"], 1, "子级要在层级里缩进")
+
     def test_swap_rejects_wrong_role(self):
         """双岗只能换部长/台务，单岗只能换部员。"""
         self.api.generate_duty(1, GROUPS)

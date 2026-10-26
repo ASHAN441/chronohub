@@ -2,7 +2,7 @@
 
 # 产品名（界面展示用；打包出的文件名是 ASCII 的 ChronoHub，见 packaging/ChronoHub.spec）
 APP_NAME = "时枢 ChronoHub"
-VERSION = "3.4.1"
+VERSION = "3.5.1"
 
 # 组织 / 项目线标识。产品名独立，但组织标识仍保留在「关于」页展示。
 ORG_NAME = "SYNUTV"

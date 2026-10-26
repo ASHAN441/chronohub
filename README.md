@@ -4,7 +4,7 @@
 
 SYNUTV 校园电视台的内部工具：把「教务系统导课表 → 多人课表叠加找共同空闲 → 排值班表」这条流水线拧成一个桌面应用。
 
-![版本](https://img.shields.io/badge/version-v3.4.1-blue)
+![版本](https://img.shields.io/badge/version-v3.5.1-blue)
 ![平台](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)
 ![Python](https://img.shields.io/badge/python-3.13-3776ab)
 

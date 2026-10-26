@@ -157,15 +157,23 @@ def generate_roster(person_dicts, specials, week, groups, totals, rng=None):
     return assignments, totals
 
 
-def swap_candidates(person_dicts, specials, week, groups, role, day, start, end, used_keys):
-    """某班次可替换的人（当时有空 + 本周未被排）。"""
+def swap_candidates(person_dicts, specials, week, groups, role, day, start, end,
+                    used_keys, include_used: bool = False):
+    """某班次可替换的人。
+
+    include_used=False（默认）：只要本周还没排过的人 —— 自动排班和"正常换人"用它。
+    include_used=True：本周已经排过的人也算进来 —— 手动换人允许同一个人一周
+    值多个班次，界面上会标出「本周已排 N 次」并二次确认。
+    """
     scope = group_scope((groups or {}).get(role))
     if not scope:
         return []
     out = []
     for person in person_dicts or []:
         key = person_key(person)
-        if not key or key in used_keys:
+        if not key:
+            continue
+        if key in used_keys and not include_used:
             continue
         if (person.get("group") or "") not in scope:
             continue

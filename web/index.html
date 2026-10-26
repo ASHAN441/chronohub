@@ -397,6 +397,10 @@
     /* 「本周不用人值班」：灰底虚线，和「缺人」明显区分开 */
     .duty-table td.duty-off{ background:color-mix(in srgb, var(--win-text) 4%, var(--win-surface));
       color:var(--win-text-muted); border-style:dashed; }
+    /* 候选里「本周已经排过」的人：暖色标出，点了会二次确认 */
+    .duty-picker-item.is-taken .c{ color:#b04a00; }
+    /* 确认框里允许换行（换人二次确认会用 \n 分段） */
+    #confirm-message{ white-space:pre-line; line-height:1.7; }
     .duty-clear-list{ max-height:260px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;
       border:1px solid var(--win-border); border-radius:7px; padding:8px; }
     .duty-clear-item{ display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;
@@ -4042,9 +4046,12 @@
             '<span>' + (slotOff ? '恢复需要人值班' : '这个时段不用人值班') + '</span></div>' +
           (list.length
             ? list.map(function(p){
-                return '<div class="duty-picker-item" data-pick="' + esc(p.key) + '">' +
+                return '<div class="duty-picker-item' + (p.times ? ' is-taken' : '') +
+                  '" data-pick="' + esc(p.key) + '">' +
                   '<span>' + esc(p.name) + '</span>' +
-                  '<span class="c">' + dutyCountOf(p.key) + ' 次</span></div>';
+                  '<span class="c">' + (p.times
+                    ? '本周已排 ' + p.times + ' 次'
+                    : dutyCountOf(p.key) + ' 次') + '</span></div>';
               }).join('')
             : '<div class="duty-picker-empty">这个时段没有可换的人<br>（都有课或本周已排）</div>');
 
@@ -4118,12 +4125,23 @@
         }
       }
 
-      async function doDutySwap(day, block, role, personKey){
+      /* 换人。手动调整允许同一个人一周值多个班次（顶班时会用到），
+         但会先弹确认——自动排班仍然保证每人每周 1 次。 */
+      async function doDutySwap(day, block, role, personKey, force){
         var roster = currentRoster();
         if(!roster) return;
         closeDutyPicker();
         try {
-          var res = await window.pywebview.api.swap_duty(roster.week, day, block, role, personKey);
+          var res = await window.pywebview.api.swap_duty(
+            roster.week, day, block, role, personKey, !!force);
+          if(res && res.need_confirm){
+            var total = (res.times || 1) + 1;
+            openConfirm('这个人本周已经排过班',
+              (res.error || '') + '。再排一次，他这周就是 ' + total +
+              ' 个班次了。\n\n自动排班保证每人每周只排 1 次，这里是手动调整，确定要排吗？',
+              function(){ doDutySwap(day, block, role, personKey, true); });
+            return;
+          }
           if(!res || res.ok === false){
             showToast('换人失败：' + ((res && res.error) || '未知错误'));
             return;

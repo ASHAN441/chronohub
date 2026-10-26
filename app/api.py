@@ -770,16 +770,33 @@ class Api:
 
         selected = (roster.get("groups") or {}).get(role) or ""
         scope = {role: self._group_scope(selected)}
+        # 手动换人允许同一人一周排多次，所以本周已经排过的人也要列出来，
+        # 只是标注「本周已排 N 次」，选中时前端会二次确认。
         keys = swap_candidates(
             people, specials, week, scope,
             role, slot["day"], slot["start"], slot["end"], used,
+            include_used=True,
         )
+
+        times = {}
+        for item in roster["assignments"]:
+            if item["day"] == day and item["block"] == block:
+                continue        # 这个班次本身不算，否则"换给同一个人"会误报
+            key = item.get("person")
+            if key:
+                times[key] = times.get(key, 0) + 1
+
         names = {}
         for person in people:
             key = duty_person_key(person)
             if key:
                 names[key] = person.get("name") or key
-        return {"candidates": [{"key": k, "name": names.get(k, k)} for k in keys]}
+        return {
+            "candidates": [
+                {"key": k, "name": names.get(k, k), "times": times.get(k, 0)}
+                for k in keys
+            ]
+        }
 
     def set_duty_off(self, week, day, block, off=True) -> dict:
         """把某个班次标成「本周不用人值班」，或取消这个标记。
@@ -829,7 +846,7 @@ class Api:
         payload["week"] = week
         return payload
 
-    def swap_duty(self, week, day, block, role, person_key) -> dict:
+    def swap_duty(self, week, day, block, role, person_key, force=False) -> dict:
         try:
             week, day, block = int(week), int(day), int(block)
         except (TypeError, ValueError):
@@ -886,11 +903,22 @@ class Api:
             if is_busy(target, specials, person_key, day, slot["start"], slot["end"], week):
                 return {"ok": False, "error": "这个人该时段没空（有课或手动标了忙）"}
 
-            for item in roster["assignments"]:
-                if item["day"] == day and item["block"] == block:
-                    continue  # 正在被替换的这个班次不算
-                if item.get("person") == person_key:
-                    return {"ok": False, "error": "这个人本周已经排过班（每周最多 1 次）"}
+            # 自动排班保证「每人每周 1 次」，但**手动换人**允许同一个人一周
+            # 值多个班次（有人请假需要顶班时确实会这样）。所以这里不硬拒，
+            # 而是先返回 need_confirm，前端弹确认后再带 force 重来一次。
+            already = sum(
+                1 for item in roster["assignments"]
+                if item.get("person") == person_key
+                and not (item["day"] == day and item["block"] == block)
+            )
+            if already and not force:
+                return {
+                    "ok": False,
+                    "need_confirm": True,
+                    "times": already,
+                    "error": "「%s」本周已经排过 %d 次班" % (
+                        target.get("name") or person_key, already),
+                }
 
             slot["person"] = person_key
             roster["assignments"] = [

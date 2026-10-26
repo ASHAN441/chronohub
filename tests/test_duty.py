@@ -297,7 +297,11 @@ class ApiDutyTest(unittest.TestCase):
 
         cands = self.api.duty_candidates(1, slot["day"], slot["block"], "member")["candidates"]
         self.assertTrue(cands, "应该至少有一个可换的人")
-        target = cands[0]["key"]
+        # 候选人现在也包含「本周已排过」的人（手动多次排班要用），
+        # 这里要挑一个本周还没排过的，才是一次「正常换人」。
+        free = [c for c in cands if not c.get("times")]
+        self.assertTrue(free, "应该还有本周没排过、当时又没课的人")
+        target = free[0]["key"]
 
         result = self.api.swap_duty(1, slot["day"], slot["block"], "member", target)
         self.assertTrue(result["ok"])
@@ -372,8 +376,12 @@ class ApiDutyTest(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("没空", result["error"])
 
-    def test_swap_rejects_double_booking(self):
-        """每周最多 1 次的限制，换人时也必须守住。"""
+    def test_manual_swap_can_double_book_but_asks_first(self):
+        """自动排班保证每人每周 1 次；**手动**换人允许同一人多次，但要先确认。
+
+        顶班场景确实会出现一个人一周值两个班，所以不能硬拒；
+        但也不能悄悄排上，所以后端返回 need_confirm，前端弹确认后再带 force 重来。
+        """
         self.api.generate_duty(1, GROUPS)
         roster = self.api.get_duty()["rosters"][0]
         slots = [a for a in roster["assignments"]
@@ -381,9 +389,40 @@ class ApiDutyTest(unittest.TestCase):
         self.assertGreaterEqual(len(slots), 2)
         target, other = slots[0], slots[1]
 
+        # 第一次：不硬拒，而是要求确认
         result = self.api.swap_duty(1, target["day"], target["block"], "member", other["person"])
         self.assertFalse(result["ok"])
-        self.assertIn("每周最多", result["error"])
+        self.assertTrue(result.get("need_confirm"), "应该返回 need_confirm 而不是直接失败")
+        self.assertEqual(result["times"], 1)
+        self.assertIn("已经排过", result["error"])
+
+        # 确认后（force=True）：真的排上，这个人一周占两个班次
+        forced = self.api.swap_duty(
+            1, target["day"], target["block"], "member", other["person"], True)
+        self.assertTrue(forced["ok"], forced)
+        roster = [r for r in forced["rosters"] if r["week"] == 1][0]
+        same = [a for a in roster["assignments"] if a.get("person") == other["person"]]
+        self.assertEqual(len(same), 2, "手动确认后应该允许同一人一周两次")
+
+    def test_candidates_include_already_scheduled(self):
+        """候选人列表要包含本周已排过的人（并给出次数），否则没法手动多次排班。"""
+        self.api.generate_duty(1, GROUPS)
+        roster = self.api.get_duty()["rosters"][0]
+        slots = [a for a in roster["assignments"]
+                 if a["kind"] == "member" and a.get("person")]
+        taken = slots[0]
+
+        slot = taken
+        result = self.api.duty_candidates(1, slot["day"], slot["block"], "member")
+        cands = result["candidates"]
+        self.assertTrue(cands, "候选人列表不该是空的")
+
+        taken_ones = [c for c in cands if c.get("times", 0) >= 1]
+        self.assertTrue(taken_ones, "本周已经排过的人也要出现在候选人里，并带 times")
+        # 正在被替换的这个班次上的人，不该被算成「已排」
+        own = [c for c in cands if c["key"] == slot["person"]]
+        if own:
+            self.assertEqual(own[0]["times"], 0, "当前班次自身不计入本周已排次数")
 
     def test_slot_can_be_marked_off(self):
         """任意班次可以标「本周不用人值班」，重排时标记要保住。"""

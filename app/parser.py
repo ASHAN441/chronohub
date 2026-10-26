@@ -21,6 +21,10 @@ _FIELD_KEYS = (
     "周学时",
     "总学时",
     "学分",
+    # 「重修标记:」是每门课信息块的**最后一个**字段。同一格里有第二门课时，
+    # 它会长在第二门课名字前面（PDF 里两段文字是连着的），必须当字段剥掉，
+    # 否则课名会变成「重修标记:人工智能专业外语」。
+    "重修标记",
 )
 _FIELD_KEY_RE = re.compile("^(?:" + "|".join(_FIELD_KEYS) + ")")
 _WEEKDAY_MAP = {
@@ -35,7 +39,8 @@ _WEEKDAY_MAP = {
 _DEFAULT_WEEKS = list(range(1, 19))
 
 # 识别算法版本：每次修改解析逻辑都要 +1，软件会据此提示/自动刷新已导入的课表。
-PARSER_VERSION = 2
+# v3：修「重修标记:」被粘进下一门课名字的问题（同一格多门课时会出现）。
+PARSER_VERSION = 3
 
 
 def parse_weeks(text: str) -> list:
@@ -114,6 +119,9 @@ def _clean_name(raw: str) -> str:
     if re.search("(?:" + "|".join(_FIELD_KEYS) + r")[:：]", name):
         name = re.split(r"[:：]", name)[-1]
     name = re.sub(r"^[\d.、，,;；]+", "", name.strip())
+    # 双保险：万一上面没切干净（比如字段名后紧跟中文），这里直接剥掉前缀。
+    # 「重修标记」属于上一门课，不该出现在这门课的名字里。
+    name = re.sub(r"^(?:重修标记|重修)[:：]?", "", name.strip())
     return name.strip()
 
 

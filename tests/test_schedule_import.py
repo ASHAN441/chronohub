@@ -25,6 +25,34 @@ SPAN = os.path.join(FIXTURES, "sample_span.pdf")
 MULTI = os.path.join(FIXTURES, "sample_multi_page.pdf")
 
 
+
+class RetakeMarkerTest(unittest.TestCase):
+    """「重修标记:」是每门课信息块的最后一个字段，不能粘到下一门课的名字上。
+
+    真实场景：同一格里有第二门课时，PDF 里的文本是连着的 ——
+    `…学分:2.0/重修标记:人工智能专业外语(5-6节)…`，
+    以前会把「重修标记:」当成本门课名字的一部分。
+    """
+
+    def test_marker_is_not_part_of_next_course_name(self):
+        from app.parser import _parse_cell
+
+        text = (
+            "数据标注工程(5-6节)4-12周/校区:主校区/场地:软件206/教师:张三"
+            "/学分:2.0/重修标记:"
+            "人工智能专业外语(5-6节)13-17周/校区:主校区/场地:软件206/教师:李四"
+            "/学分:2.0/重修标记:"
+        )
+        names = [c.name for c in _parse_cell(text, 3)]
+        self.assertEqual(names, ["数据标注工程", "人工智能专业外语"])
+
+    def test_marker_alone_produces_no_course(self):
+        from app.parser import _parse_cell
+
+        # 只有一个字段残片、没有课名 → 不该凭空造出一门课
+        text = "学分:2.0/重修标记:(1-2节)1-8周/校区:主校区"
+        self.assertEqual([c.name for c in _parse_cell(text, 1) if c.name.strip()], [])
+
 class ScheduleImportTest(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()

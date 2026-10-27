@@ -1,4 +1,3 @@
-```markdown
 # 时枢 ChronoHub
 
 > 用影像记录师大，用青春诠释梦想。
@@ -8,6 +7,7 @@ SYNUTV 校园电视台的内部工具：把「教务系统导课表 → 多人�
 ![版本](https://img.shields.io/badge/version-v3.5.1-blue)
 ![平台](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)
 ![Python](https://img.shields.io/badge/python-3.13-3776ab)
+![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
@@ -84,6 +84,31 @@ python -m unittest discover -s tests
 
 ---
 
+## 做安装程序
+
+```bash
+python tools/build_installer.py          # 用现有 dist/ChronoHub
+python tools/build_installer.py --build  # 先重新打包再编译
+```
+
+产出 `dist/installer/ChronoHub-Setup-v{版本}.exe`（约 162 MB，lzma2 极限压缩）。
+需要装 [Inno Setup 6](https://jrsoftware.org/isdl.php)；版本号自动从
+`app/config.py` 读，不用两处手改。
+
+### 为什么装到用户目录
+
+安装路径是 **`%LOCALAPPDATA%\Programs\ChronoHub`**，不是 `Program Files`。
+
+因为程序把数据写在 exe 旁边的 `data\` 里（便携式布局）。装到
+`Program Files` 的话普通用户对该目录没有写权限，**程序会存不了任何数据**。
+装到用户目录既不需要管理员权限，`data\` 也正常可写。
+
+### 安装包不含数据，也不会删数据
+
+- 打包时排除 `data\`：发布包永远是干净的，不带开发机上的课表/账号
+- **覆盖安装**：`data\` 不在安装清单里，原样保留
+- **卸载**：默认为你保留 `data\`，只有确认对话框里点「是」才会删
+
 ## 升级指南（如何保留数据）
 
 这个软件没有复杂的安装程序，也没有乱七八糟的注册表项，本质上就是一个纯净的文件夹。所有的核心数据都存在 `ChronoHub\data\` 里，所以升级时只要**护好这个目录**就行。
@@ -120,17 +145,26 @@ python -m unittest discover -s tests
 
 ---
 
-## 第三y方资源
+## 第三方资源
 
 * 开屏字体：[得意黑 Smiley Sans](https://github.com/atelier-anchor/smiley-sans)，基于 SIL Open Font License 1.1 开源。
 * 其他依赖详见 `requirements.txt`。
 
 ---
 
+## 许可
+
+本项目采用 **MIT 许可证** —— 详见 [LICENSE](LICENSE)。
+简单说：可以自由使用、修改、再发布，包括商用，只要保留版权声明。
+
+### 第三方组件的许可
+
+| 组件 | 许可 | 说明 |
+|---|---|---|
+| PySide6 / Qt | **LGPLv3** | 本项目以「exe + 独立的 `_internal\*.dll`」动态链接方式分发，符合 LGPL 要求；请勿改成静态链接 |
+| 得意黑 Smiley Sans | **SIL OFL 1.1** | 可随软件分发，需保留字体许可声明 |
+| pdfplumber / python-docx 等 | MIT / BSD | 见 `requirements.txt` |
+
 ## 关于
 
-SYNUTV 出品 · 开发者：阿山 · [ashan441@163.com](https://www.google.com/search?q=mailto%3Aashan441%40163.com) · © 2026 阿山
-
-```
-
-```
+SYNUTV 出品 · 开发者：阿山 · ashan441@163.com · © 2026 阿山

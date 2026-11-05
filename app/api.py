@@ -1,4 +1,6 @@
 import json
+import shutil
+import subprocess
 import tkinter as tk
 import os
 import threading
@@ -9,9 +11,11 @@ from tkinter import filedialog
 
 from .account_service import AccountService
 from .clipboard import set_text_temporary
+from . import share_pack
 from .config import app_info
 from .docx_export import export_roster, template_path
 from .duty_scheduler import generate_roster, is_busy, swap_candidates
+from .models import Person
 from .duty_store import (
     ADJUST_FILE,
     DUTY_FILE,
@@ -1148,6 +1152,38 @@ class Api:
             root.destroy()
 
     @staticmethod
+    def _ask_save_path(default_name: str, filetypes: list) -> str:
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        try:
+            path = filedialog.asksaveasfilename(
+                parent=root,
+                title="保存数据包",
+                initialfile=default_name,
+                defaultextension=".json",
+                filetypes=filetypes,
+            )
+            return path or ""
+        finally:
+            root.destroy()
+
+    @staticmethod
+    def _ask_open_path(filetypes: list) -> str:
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        try:
+            path = filedialog.askopenfilename(
+                parent=root,
+                title="选择数据包文件",
+                filetypes=filetypes,
+            )
+            return path or ""
+        finally:
+            root.destroy()
+
+    @staticmethod
     def _ask_pdf_folder() -> str:
         root = tk.Tk()
         root.withdraw()
@@ -1160,6 +1196,213 @@ class Api:
             return folder or ""
         finally:
             root.destroy()
+
+    # ================= 数据包（跨设备搬运） =================
+
+    _PACK_FILETYPES = [("ChronoHub 数据包", "*.json"), ("所有文件", "*.*")]
+
+    def _current_summary(self) -> dict:
+        with self._people_lock:
+            return share_pack.summarize_data({
+                "people": [p.to_dict() for p in self.people],
+                "groups": list(self.groups),
+                "specials": list(self.specials),
+                "rosters": list(self.rosters),
+                "adjustments": list(self.adjustments),
+            })
+
+    def get_share_summary(self) -> dict:
+        """当前设备上的数据摘要，给「数据包」面板显示用。"""
+        return {"ok": True, "summary": self._current_summary()}
+
+    def open_folder(self, path: str = "") -> dict:
+        """在资源管理器里定位导出的文件（数据包导出后点「打开文件夹」）。"""
+        target = (path or "").strip()
+        if not target:
+            return self.open_exports_folder()
+        try:
+            target = os.path.normpath(target)
+            if os.path.isfile(target):
+                subprocess.Popen(["explorer", "/select,", target])
+                return {"ok": True, "path": target}
+            if os.path.isdir(target):
+                os.startfile(target)  # noqa: S606 - Windows 专用
+                return {"ok": True, "path": target}
+            return {"ok": False, "error": "文件或文件夹不存在"}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": str(exc)}
+
+    def export_share_pack(self) -> dict:
+        """把课表、分组、特殊安排、值班表打包成一个 JSON 文件。
+
+        不包含教务账号：密码用 DPAPI 加密绑本机，拷过去解不开，
+        而且那种文件也不该到处传。
+        """
+        with self._people_lock:
+            people = [p.to_dict() for p in self.people]
+            groups = [dict(g) for g in self.groups]
+            specials = [dict(item) for item in self.specials]
+            rosters = [json.loads(json.dumps(r)) for r in self.rosters]
+            adjustments = [dict(item) for item in self.adjustments]
+
+        if not people:
+            return {"ok": False, "error": "还没有导入任何课表，没有可导出的内容"}
+
+        path = self._ask_save_path(share_pack.default_filename(), self._PACK_FILETYPES)
+        if not path:
+            return {"ok": False, "cancelled": True}
+
+        package = share_pack.build(
+            people, groups, specials, rosters, adjustments,
+            app_version=str((app_info() or {}).get("version") or ""),
+        )
+        text = share_pack.dumps(package)
+        try:
+            with open(path, "w", encoding="utf-8", newline="\n") as stream:
+                stream.write(text)
+        except OSError as exc:
+            return {"ok": False, "error": f"写文件失败：{exc}"}
+
+        return {
+            "ok": True,
+            "path": path,
+            "summary": package["summary"],
+            "bytes": len(text.encode("utf-8")),
+        }
+
+    def import_share_pack(self) -> dict:
+        """选择数据包并解析，**先不落盘**。前端拿到摘要后再调 confirm。"""
+        path = self._ask_open_path(self._PACK_FILETYPES)
+        if not path:
+            return {"ok": False, "cancelled": True}
+
+        try:
+            with open(path, "r", encoding="utf-8") as stream:
+                text = stream.read()
+        except (OSError, UnicodeDecodeError) as exc:
+            return {"ok": False, "error": f"读文件失败：{exc}"}
+
+        package, error = share_pack.loads(text)
+        if error:
+            return {"ok": False, "error": error}
+
+        summary = package["summary"]
+        if not summary.get("people"):
+            return {"ok": False, "error": "这个数据包里没有人员课表，导入会清空现有数据，已拒绝"}
+
+        self._pending_share = {"path": path, "package": package}
+        return {
+            "ok": True,
+            "path": path,
+            "summary": summary,
+            "current": self._current_summary(),
+            "exported_at": package.get("exported_at") or "",
+            "app_version": package.get("app_version") or "",
+            "file_app_version": package.get("app_version") or "",
+        }
+
+    def cancel_share_pack(self) -> dict:
+        self._pending_share = None
+        return {"ok": True}
+
+    def confirm_share_pack(self) -> dict:
+        """真正写入。落盘前把所有数据备份到 data/backup/import-时间/。
+
+        写完会重新读一遍并核对人数；对不上就自动还原备份 ——
+        导入是整体覆盖，宁可失败也不能留下半套数据。
+        """
+        pending = getattr(self, "_pending_share", None)
+        if not pending:
+            return {"ok": False, "error": "没有待确认的数据包，请重新选择文件"}
+
+        self._pending_share = None
+        data = pending["package"]["data"]
+        expected = len(data.get("people") or [])
+
+        backup_dir = self._backup_before_import()
+        try:
+            with self._people_lock:
+                people_obj = [
+                    Person.from_dict(item) for item in data["people"]
+                    if isinstance(item, dict)
+                ]
+                save_people(people_obj, self.data_path)
+                save_groups(data["groups"], self.groups_path)
+                save_specials(data["specials"], self.specials_path)
+                save_rosters(data["rosters"], self.duty_path)
+                save_adjustments(data["adjustments"], self.adjust_path)
+
+                self.people = load_people(self.data_path)
+                self.groups = load_groups(self.groups_path)
+                self.specials = load_specials(self.specials_path)
+                self.rosters = load_rosters(self.duty_path)
+                self.adjustments = load_adjustments(self.adjust_path)
+        except Exception as exc:  # noqa: BLE001
+            restored = self._restore_import_backup(backup_dir)
+            return {
+                "ok": False,
+                "error": f"导入失败：{exc}",
+                "restored": restored,
+            }
+
+        if len(self.people) != expected:
+            restored = self._restore_import_backup(backup_dir)
+            return {
+                "ok": False,
+                "error": (
+                    f"导入后人数对不上（期望 {expected}，实际 {len(self.people)}），"
+                    "可能文件被改坏了"
+                ),
+                "restored": restored,
+            }
+
+        return {
+            "ok": True,
+            "summary": self._current_summary(),
+            "backup": backup_dir,
+        }
+
+    def _backup_before_import(self) -> str:
+        """把当前五个数据文件复制一份，返回备份目录（失败返回空串）。"""
+        base = os.path.dirname(os.path.abspath(self.data_path))
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        target = os.path.join(base, "backup", "import-" + stamp)
+        try:
+            os.makedirs(target, exist_ok=True)
+            for path in (
+                self.data_path, self.groups_path, self.specials_path,
+                self.duty_path, self.adjust_path,
+            ):
+                if path and os.path.exists(path):
+                    shutil.copy2(path, os.path.join(target, os.path.basename(path)))
+        except OSError:
+            return ""
+        return target
+
+    def _restore_import_backup(self, backup_dir: str) -> bool:
+        """导入失败时把备份拷回去。"""
+        if not backup_dir or not os.path.isdir(backup_dir):
+            return False
+        pairs = (
+            ("people.json", self.data_path),
+            ("groups.json", self.groups_path),
+            ("specials.json", self.specials_path),
+            ("duty.json", self.duty_path),
+            ("duty_adjust.json", self.adjust_path),
+        )
+        try:
+            for name, dest in pairs:
+                src = os.path.join(backup_dir, name)
+                if os.path.exists(src):
+                    shutil.copy2(src, dest)
+            self.people = load_people(self.data_path)
+            self.groups = load_groups(self.groups_path)
+            self.specials = load_specials(self.specials_path)
+            self.rosters = load_rosters(self.duty_path)
+            self.adjustments = load_adjustments(self.adjust_path)
+            return True
+        except OSError:
+            return False
 
     # ================= 账号管理（来自原「教务系统管理器」） =================
 

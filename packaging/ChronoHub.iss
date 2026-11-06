@@ -91,24 +91,12 @@ Filename: "{app}\{#AppExeName}"; Description: "立即运行 {#AppName}"; \
 ; 刻意不写 [UninstallDelete] 来删 data\ —— 用户数据默认保留，
 ; 要不要删交给下面 CurUninstallStepChanged 里问用户。
 
-[Code]
-procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
-var
-  DataDir: string;
-begin
-  if CurUninstallStep = usPostUninstall then
-  begin
-    DataDir := ExpandConstant('{app}\data');
-    if DirExists(DataDir) then
-    begin
-      if MsgBox('是否同时删除你的数据？' + #13#10 + #13#10 +
-                'data 目录里有课表、教务账号、值班表、导出的文件。' + #13#10 +
-                '选「是」会全部删除且无法恢复；' + #13#10 +
-                '选「否」则保留，以后重装这个软件还能继续用。',
-                mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
-      begin
-        DelTree(DataDir, True, True, True);
-      end;
-    end;
-  end;
-end;
+; 卸载时**不删 data\\**。
+;
+; 原来这里会弹窗问「是否同时删除数据」，看着贴心，实际埋了个雷：
+; 覆盖升级时 Setup 会先在后台静默跑一次旧版卸载，那次是无人值守的，
+; MsgBox 一弹就永远挂着——实测升级卡死 7 分钟后超时失败。
+;
+; 卸载脚本里也拿不到 CmdLineParamExists（编译不过），判断不了当前是不是静默。
+; 所以干脆不问了：数据一律保留，要彻底删除请自己删掉安装目录下的 data 文件夹。
+; 这样升级、静默卸载、卸载重装都不会有数据风险。

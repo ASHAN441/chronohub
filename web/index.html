@@ -407,11 +407,18 @@
       padding:5px 6px; border-radius:5px; }
     .duty-clear-item:hover{ background:var(--win-surface-3); }
     .duty-clear-item .c{ margin-left:auto; font-size:11.5px; color:var(--win-text-muted); }
-    /* 数据包面板：当前数据摘要 */
-    .pack-stats{ font-size:12.5px; color:var(--win-text-muted); line-height:1.9;
-      background:var(--win-surface-2); border:1px solid var(--win-border);
-      border-radius:7px; padding:9px 11px; }
-    .pack-stats b{ color:var(--win-text); font-weight:500; }
+    /* 「导出」下拉菜单 */
+    .menu-wrap{ position:relative; display:inline-flex; }
+    .tb-btn .caret{ font-size:9px; color:var(--win-text-muted); margin-left:5px; }
+    .tb-btn.is-open{ background:var(--win-surface-3); }
+    .dropdown{ position:absolute; top:34px; left:0; z-index:30; min-width:286px; padding:5px;
+      background:var(--win-surface); border:1px solid var(--win-border); border-radius:8px;
+      box-shadow:0 12px 30px rgba(0,0,0,.16); }
+    .dropdown-item{ display:flex; flex-direction:column; gap:2px; padding:8px 10px;
+      border-radius:6px; cursor:pointer; }
+    .dropdown-item:hover{ background:var(--win-surface-3); }
+    .dropdown-item .t{ font-size:13px; color:var(--win-text); }
+    .dropdown-item .d{ font-size:11.5px; color:var(--win-text-muted); }
     .duty-dual{ display:flex; flex-direction:column; gap:2px; line-height:1.45; }
     .duty-dual span{ font-size:12px; }
     .duty-dual .role{ color:var(--win-text-muted); font-size:10.5px; margin-right:3px; }
@@ -559,9 +566,20 @@
       <section class="view" id="view-freetime">
   <div class="win-toolbar">
     <button class="tb-btn primary" id="import-btn" type="button">导入课表</button>
-    <button class="tb-btn" id="export-btn" type="button">导出</button>
+    <span class="menu-wrap">
+      <button class="tb-btn" id="export-btn" type="button">导出<span class="caret">▼</span></button>
+      <div class="dropdown" id="export-menu" hidden>
+        <div class="dropdown-item" data-export="pack">
+          <span class="t">导出数据包</span>
+          <span class="d">课表 · 分组 · 特殊安排 · 值班表，一个文件搬走</span>
+        </div>
+        <div class="dropdown-item" data-export="import">
+          <span class="t">从数据包导入…</span>
+          <span class="d">覆盖当前数据，导入前自动备份到 data/backup</span>
+        </div>
+      </div>
+    </span>
     <button class="tb-btn" id="add-special-btn" type="button">添加</button>
-    <button class="tb-btn" id="pack-btn" type="button" title="把课表、分组、值班表打包成一个文件，拷到别的电脑上用">数据包</button>
     <span class="tb-sep"></span>
     <label class="tb-field">学期
       <select class="tb-select" id="semester-select"></select>
@@ -742,7 +760,7 @@
               <img class="about-big-logo" src="assets/logo.png" alt="SYNUTV 校园电视台">
             </picture>
             <div class="about-big-name" id="about-big-name">时枢 ChronoHub</div>
-            <div class="about-big-version" id="about-big-version">v3.6.1</div>
+            <div class="about-big-version" id="about-big-version">v3.6.2</div>
             <div class="about-note" id="about-note"></div>
             <div class="about-slogan">
               <span class="line">用影像记录师大</span>
@@ -894,32 +912,6 @@
           <select class="win-input" id="group-target"></select>
           <button class="tb-btn primary" id="group-apply" type="button">应用到所选</button>
           <button class="tb-btn" id="group-remove" type="button">删除所选</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="win-modal" id="pack-modal" hidden>
-    <div class="win-modal-backdrop" id="pack-backdrop"></div>
-    <div class="win-modal-card">
-      <div class="win-modal-head">
-        <span>数据包</span>
-        <button class="win-modal-close" id="pack-close" type="button" aria-label="关闭">✕</button>
-      </div>
-      <div class="group-modal-body">
-        <div class="win-sidebar-sub" style="padding:0 0 10px; line-height:1.75">
-          把课表、分组、特殊安排、值班表打包成<b>一个文件</b>。拷到别的电脑上，
-          在新设备里点「从文件导入」就能看到同样的数据。
-        </div>
-        <div class="pack-stats" id="pack-stats">正在统计…</div>
-        <div class="win-sidebar-sub" style="padding:10px 0 0; line-height:1.7">
-          包里<b>不含教务账号和密码</b>——密码用 Windows DPAPI 加密、绑定本机，换台电脑解不开，
-          所以干脆不打包。
-        </div>
-        <div class="group-modal-actions">
-          <button class="tb-btn" id="pack-cancel" type="button">关闭</button>
-          <button class="tb-btn" id="pack-export" type="button">导出到文件</button>
-          <button class="tb-btn primary" id="pack-import" type="button">从文件导入</button>
         </div>
       </div>
     </div>
@@ -1096,7 +1088,7 @@
       ];
 
       var DEFAULT_APP_INFO = {
-        name:'时枢 ChronoHub', version:'3.6.1', org:'SYNUTV',
+        name:'时枢 ChronoHub', version:'3.6.2', org:'SYNUTV',
         developer:'阿山', contact:'ashan441@163.com',
         copyright:'© 2026 阿山',
         merged_from:'由「教务系统管理器 v1.0.0」与「多人空课表 v2.1」合并'
@@ -2506,7 +2498,6 @@
       document.getElementById('roster-search').addEventListener('input', renderRoster);
       document.getElementById('person-close').addEventListener('click', closePersonModal);
       document.getElementById('person-backdrop').addEventListener('click', closePersonModal);
-      document.getElementById('export-btn').addEventListener('click', function(){ showToast('导出功能开发中，下一版本提供。'); });
       document.getElementById('about-close').addEventListener('click', function(){ document.getElementById('about-modal').hidden = true; });
       document.getElementById('about-backdrop').addEventListener('click', function(){ document.getElementById('about-modal').hidden = true; });
       document.getElementById('import-close').addEventListener('click', closeImportModal);
@@ -3354,7 +3345,7 @@
       bindAccounts();
       bindSpecials();
       bindDuty();
-      bindPack();
+      bindExportMenu();
       updateStatusbar();
       // 账号列表与教务系统地址都依赖 js_api 桥，必须等桥注入完成再拉，
       // 否则 isDesktop() 会是 false 而误用兜底数据（踩过）。
@@ -4312,24 +4303,19 @@
         return parts.join(' · ') || '暂无数据';
       }
 
-      async function openPackModal(){
-        document.getElementById('pack-modal').hidden = false;
-        var box = document.getElementById('pack-stats');
-        box.textContent = '正在统计…';
-        if(!isDesktop()){
-          box.textContent = '浏览器预览模式：请在桌面应用中操作';
-          return;
-        }
-        try {
-          var res = await window.pywebview.api.get_share_summary();
-          box.innerHTML = '当前数据：' + packSummaryText((res && res.summary) || {});
-        } catch(e) {
-          box.textContent = '统计失败：' + (e && e.message ? e.message : e);
-        }
+      function closeExportMenu(){
+        var menu = document.getElementById('export-menu');
+        if(menu) menu.hidden = true;
+        var btn = document.getElementById('export-btn');
+        if(btn) btn.classList.remove('is-open');
       }
 
-      function closePackModal(){
-        document.getElementById('pack-modal').hidden = true;
+      function toggleExportMenu(){
+        var menu = document.getElementById('export-menu');
+        if(!menu) return;
+        var willOpen = menu.hidden;
+        menu.hidden = !willOpen;
+        document.getElementById('export-btn').classList.toggle('is-open', willOpen);
       }
 
       async function doExportPack(){
@@ -4341,8 +4327,9 @@
             showToast('导出失败：' + ((res && res.error) || '未知错误'));
             return;
           }
-          closePackModal();
-          showToast('已导出（' + Math.round((res.bytes || 0) / 1024) + ' KB）', '打开文件夹', function(){
+          closeExportMenu();
+          showToast('已导出 ' + packSummaryText(res.summary) + ' · ' +
+                    Math.round((res.bytes || 0) / 1024) + ' KB', '打开文件夹', function(){
             window.pywebview.api.open_folder(res.path).catch(function(){});
           });
         } catch(e) {
@@ -4379,7 +4366,7 @@
             showToast('导入失败：' + msg);
             return;
           }
-          closePackModal();
+          closeExportMenu();
           await reloadAfterImport();
           showToast('已导入：' + packSummaryText(res.summary));
         } catch(e) {
@@ -4400,13 +4387,19 @@
         try { await loadDuty(); } catch(e) { /* 值班表加载失败不影响课表 */ }
       }
 
-      function bindPack(){
-        document.getElementById('pack-btn').addEventListener('click', openPackModal);
-        document.getElementById('pack-close').addEventListener('click', closePackModal);
-        document.getElementById('pack-cancel').addEventListener('click', closePackModal);
-        document.getElementById('pack-backdrop').addEventListener('click', closePackModal);
-        document.getElementById('pack-export').addEventListener('click', doExportPack);
-        document.getElementById('pack-import').addEventListener('click', doImportPack);
+      function bindExportMenu(){
+        document.getElementById('export-btn').addEventListener('click', function(e){
+          e.stopPropagation();
+          toggleExportMenu();
+        });
+        document.getElementById('export-menu').addEventListener('click', function(e){
+          var item = e.target.closest ? e.target.closest('[data-export]') : null;
+          if(!item) return;
+          closeExportMenu();
+          if(item.getAttribute('data-export') === 'pack') doExportPack();
+          else doImportPack();
+        });
+        document.addEventListener('click', closeExportMenu);
       }
 
       function bindDuty(){

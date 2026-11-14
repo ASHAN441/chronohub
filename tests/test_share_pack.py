@@ -115,7 +115,7 @@ class SharePackApiTest(unittest.TestCase):
 
     def test_export_then_import_on_another_device(self):
         # --- A 设备导出 ---
-        self.api._ask_save_path = lambda *a, **k: self.pack_path
+        self.api._ask_pack_save_path = lambda *a, **k: self.pack_path
         result = self.api.export_share_pack()
         self.assertTrue(result["ok"], result)
         self.assertTrue(os.path.exists(self.pack_path))
@@ -124,7 +124,7 @@ class SharePackApiTest(unittest.TestCase):
         # --- B 设备导入 ---
         other = make_api(os.path.join(self.root, "devB"))
         try:
-            other._ask_open_path = lambda *a, **k: self.pack_path
+            other._ask_pack_open_path = lambda *a, **k: self.pack_path
 
             preview = other.import_share_pack()
             self.assertTrue(preview["ok"], preview)
@@ -142,7 +142,7 @@ class SharePackApiTest(unittest.TestCase):
             other.accounts.close()
 
     def test_pack_contains_no_credentials(self):
-        self.api._ask_save_path = lambda *a, **k: self.pack_path
+        self.api._ask_pack_save_path = lambda *a, **k: self.pack_path
         self.assertTrue(self.api.export_share_pack()["ok"])
 
         with open(self.pack_path, encoding="utf-8") as handle:
@@ -153,7 +153,7 @@ class SharePackApiTest(unittest.TestCase):
     def test_import_rejects_broken_file_and_keeps_data(self):
         with open(self.pack_path, "w", encoding="utf-8") as handle:
             handle.write("这不是数据包")
-        self.api._ask_open_path = lambda *a, **k: self.pack_path
+        self.api._ask_pack_open_path = lambda *a, **k: self.pack_path
 
         result = self.api.import_share_pack()
         self.assertFalse(result["ok"])
@@ -164,7 +164,7 @@ class SharePackApiTest(unittest.TestCase):
         package = share_pack.build([], [], [], [], [], app_version="3.5.1")
         with open(self.pack_path, "w", encoding="utf-8") as handle:
             handle.write(share_pack.dumps(package))
-        self.api._ask_open_path = lambda *a, **k: self.pack_path
+        self.api._ask_pack_open_path = lambda *a, **k: self.pack_path
 
         result = self.api.import_share_pack()
         self.assertFalse(result["ok"])
@@ -177,13 +177,13 @@ class SharePackApiTest(unittest.TestCase):
         self.assertIn("重新选择", result["error"])
 
     def test_import_overwrites_previous_data(self):
-        self.api._ask_save_path = lambda *a, **k: self.pack_path
+        self.api._ask_pack_save_path = lambda *a, **k: self.pack_path
         self.assertTrue(self.api.export_share_pack()["ok"])
 
         # 当前设备只有 1 个人，导入后应该变成 2 个
         self.api.people = [Person(name="临时", student_id="X")]
         self.api.rosters = []
-        self.api._ask_open_path = lambda *a, **k: self.pack_path
+        self.api._ask_pack_open_path = lambda *a, **k: self.pack_path
         self.assertTrue(self.api.import_share_pack()["ok"])
         self.assertTrue(self.api.confirm_share_pack()["ok"])
         self.assertEqual(len(self.api.people), 2)

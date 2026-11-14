@@ -66,6 +66,67 @@ def _set_cell_text(cell, text: str) -> None:
         _set_paragraph_text(extra, "")
 
 
+def _set_cell_lines(cell, lines) -> None:
+    """把单元格写成多行：第一行沿用原格式，后面的行照抄格式但字号收小。
+
+    「人名 + （分组）」要挤在一个高度有限的格子里，第二行必须比第一行小，
+    所以不能直接复用 `_set_cell_text`。
+    """
+    lines = [line for line in lines if line]
+    if not lines:
+        _set_cell_text(cell, "")
+        return
+
+    _set_cell_text(cell, lines[0])
+    if len(lines) == 1:
+        return
+
+    first = cell.paragraphs[0]
+    base_size = None
+    if first.runs and first.runs[0].font.size is not None:
+        base_size = first.runs[0].font.size
+
+    for index, text in enumerate(lines[1:], start=1):
+        if index < len(cell.paragraphs):
+            paragraph = cell.paragraphs[index]
+            _set_paragraph_text(paragraph, text)
+        else:
+            paragraph = cell.add_paragraph()
+            _set_paragraph_text(paragraph, text)
+        _tighten(paragraph)
+        if base_size is not None and paragraph.runs:
+            from docx.shared import Pt
+
+            size = min(base_size.pt * 0.7, 9.0)
+            paragraph.runs[0].font.size = Pt(round(size, 1))
+
+    # 第一行也别留着大段行距，否则两行撑得比三行还高
+    _tighten(first)
+
+
+def _tighten(paragraph) -> None:
+    """去掉段前段后间距、压成单倍行距，让两行字贴在一起。"""
+    from docx.shared import Pt
+
+    paragraph.paragraph_format.space_before = Pt(0)
+    paragraph.paragraph_format.space_after = Pt(0)
+    paragraph.paragraph_format.line_spacing = 1.0
+
+
+def _group_text(group: str, label: str = "") -> str:
+    """分组的显示形式：（xxx）。
+
+    label 是「部长：」这类前缀的标签 —— 部长的分组本来就是「部长」，
+    再在下面写一遍（部长）是废话，跳过。
+    """
+    group = (group or "").strip()
+    if not group:
+        return ""
+    if label and label in group:
+        return ""
+    return f"（{group}）"
+
+
 def _fix_minister_label(row) -> None:
     """把模板里 9-10 节那行的「(台务/部长)」改成「(部长)」。
 
@@ -101,11 +162,18 @@ def _block_start(label: str):
     return None
 
 
-def export_roster(roster: dict, names: dict, out_path: str, template: str = None) -> str:
+def export_roster(
+    roster: dict,
+    names: dict,
+    out_path: str,
+    template: str = None,
+    groups: dict = None,
+) -> str:
     """把一张值班表填进模板并另存。
 
     roster  {"week": 3, "assignments": [...]}
     names   {人员key: 显示名}
+    groups  {人员key: 分组名} —— 传了就在人名下面多加一行（分组）
     """
     from docx import Document
 
@@ -117,6 +185,7 @@ def export_roster(roster: dict, names: dict, out_path: str, template: str = None
 
     document = Document(source)
     week = roster.get("week")
+    groups = groups or {}
 
     # 1) 标题里的周次
     for paragraph in document.paragraphs:
@@ -149,6 +218,12 @@ def export_roster(roster: dict, names: dict, out_path: str, template: str = None
             return ""
         return names.get(key, key)
 
+    def group_of(key: str) -> str:
+        key = str(key or "").strip()
+        if not key:
+            return ""
+        return groups.get(key, "")
+
     filled = 0
     for row in table.rows:
         label = _row_label(row)
@@ -178,13 +253,19 @@ def export_roster(roster: dict, names: dict, out_path: str, template: str = None
                 item = by_day_minister.get(day)
                 who = name_of(item.get("person")) if item else ""
                 text = f"部长：{who}" if who else ""
-                _set_cell_text(cell, text)
+                _set_cell_lines(
+                    cell,
+                    [text, _group_text(group_of(item.get("person")), "部长") if item else ""],
+                )
                 if text:
                     filled += 1
             else:
                 item = by_day_block.get((day, start))
                 text = name_of(item.get("person")) if item else ""
-                _set_cell_text(cell, text)
+                _set_cell_lines(
+                    cell,
+                    [text, _group_text(group_of(item.get("person"))) if item else ""],
+                )
                 if text:
                     filled += 1
 

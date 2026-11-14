@@ -741,6 +741,132 @@ class ExportTest(unittest.TestCase):
         self.assertEqual(east_asia, "黑体", "中文字体应继承模板的黑体")
         self.assertEqual(run.font.size.pt, 12.0, "字号应继承模板的 12pt")
 
+    def _export(self, name="第3周值班表.docx"):
+        if not os.path.exists(TEMPLATE):
+            self.skipTest("缺少值班表.docx 模板")
+        self.api.generate_duty(3, GROUPS)
+        out = os.path.join(self._tmp.name, name)
+        result = self.api.export_duty(3, out)
+        self.assertTrue(result["ok"], result.get("error"))
+        return out
+
+    def test_export_shows_group_under_name(self):
+        """人名下面要带一行（分组），打开文档就能看出这人属于哪个部门。"""
+        out = self._export("group.docx")
+
+        from docx import Document
+
+        document = Document(out)
+        table = document.tables[0]
+
+        found = None
+        for row in table.rows:
+            for cell in row.cells[1:]:
+                lines = [p.text.strip() for p in cell.paragraphs]
+                if len(lines) >= 2 and lines[1]:
+                    found = lines
+                    break
+            if found:
+                break
+
+        self.assertIsNotNone(found, "填了人名的格子下面应有第二行分组")
+        self.assertTrue(found[0], "第一行还是人名")
+        self.assertTrue(
+            found[1].startswith("（") and found[1].endswith("）"),
+            f"分组应写成（xxx），实际是 {found[1]!r}",
+        )
+        self.assertIn("部员", found[1])
+
+    def test_export_group_line_is_smaller_than_name(self):
+        """两行要挤进原本一行的格子，分组那行必须比人名小。"""
+        out = self._export("group-size.docx")
+
+        from docx import Document
+
+        document = Document(out)
+        for row in document.tables[0].rows:
+            for cell in row.cells[1:]:
+                lines = cell.paragraphs
+                if len(lines) < 2 or not lines[1].text.strip():
+                    continue
+                name_run = lines[0].runs[0]
+                group_run = lines[1].runs[0]
+                if name_run.font.size and group_run.font.size:
+                    self.assertLess(
+                        group_run.font.size.pt,
+                        name_run.font.size.pt,
+                        "分组文字的号数应小于人名",
+                    )
+                return
+        self.skipTest("这张表里没有带分组的格子")
+
+    def test_minister_cell_does_not_repeat_group(self):
+        """「部长：x」下面不用再写一遍（部长），那是废话。"""
+        out = self._export("minister.docx")
+
+        from docx import Document
+
+        document = Document(out)
+        minister_cells = []
+        for row in document.tables[0].rows:
+            label = (row.cells[0].text or "").replace(" ", "").replace("\n", "")
+            if "部长" not in label:
+                continue
+            minister_cells.extend(row.cells[1:])
+
+        self.assertTrue(minister_cells, "模板里应有 9-10 节部长行")
+        for cell in minister_cells:
+            text = cell.text or ""
+            if not text.strip():
+                continue
+            self.assertNotIn("（部长）", text, "部长行不该重复写（部长）")
+
+    def test_export_dialog_result_is_used(self):
+        """不传路径时走保存对话框，选到哪就存到哪。
+
+        这条直接钉住「保存对话框打不开」那个 bug：方法是重名时
+        `self._ask_duty_save_path(week)` 会抛 TypeError，被吞掉后退回
+        data/exports 并带上 note。看到 note 就是对话框这条路没走通。
+        """
+        if not os.path.exists(TEMPLATE):
+            self.skipTest("缺少值班表.docx 模板")
+
+        self.api.generate_duty(3, GROUPS)
+        chosen = os.path.join(self._tmp.name, "我自己起的名字.docx")
+        self.api._ask_duty_save_path = lambda week: chosen
+
+        result = self.api.export_duty(3)
+        self.assertTrue(result["ok"], result.get("error"))
+        self.assertEqual(result.get("note"), "", "不该退到兜底目录")
+        self.assertEqual(os.path.abspath(result["path"]), os.path.abspath(chosen))
+        self.assertTrue(os.path.exists(chosen))
+
+    def test_export_dialog_cancel_close_no_file(self):
+        if not os.path.exists(TEMPLATE):
+            self.skipTest("缺少值班表.docx 模板")
+
+        self.api.generate_duty(3, GROUPS)
+        self.api._ask_duty_save_path = lambda week: ""
+
+        result = self.api.export_duty(3)
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error"], "已取消")
+
+    def test_export_appends_docx_when_extension_omitted(self):
+        """保存对话框不认文件类型过滤，用户很容易存成没后缀的文件。"""
+        if not os.path.exists(TEMPLATE):
+            self.skipTest("缺少值班表.docx 模板")
+
+        self.api.generate_duty(3, GROUPS)
+        self.api._ask_duty_save_path = lambda week: os.path.join(
+            self._tmp.name, "第3周值班表"
+        )
+
+        result = self.api.export_duty(3)
+        self.assertTrue(result["ok"], result.get("error"))
+        self.assertTrue(result["path"].endswith(".docx"), result["path"])
+        self.assertTrue(os.path.exists(result["path"]))
+
     def test_export_missing_week(self):
         result = self.api.export_duty(7, os.path.join(self._tmp.name, "x.docx"))
         self.assertFalse(result["ok"])

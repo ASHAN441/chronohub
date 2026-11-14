@@ -59,6 +59,21 @@ _RESIZE_EDGES = {
 }
 
 
+def _ensure_extension(path: str, ext: str) -> str:
+    """没写扩展名时补上。
+
+    pywebview 的 Qt 保存对话框不认 file_types（源码里 SAVE 分支没带过滤串），
+    用户把文件名改成「第3周值班表」就会存成一个没有后缀的文件，
+    双击打不开。这里兜一下。
+    """
+    path = (path or "").strip()
+    if not path:
+        return path
+    if os.path.splitext(path)[1]:
+        return path
+    return path + ext
+
+
 def _default_save_dir() -> str:
     """保存对话框的默认目录：桌面优先，其次用户主目录。
 
@@ -297,7 +312,9 @@ class Api:
 
     def remove_group(self, name: str) -> dict:
         name = (name or "").strip()
-        targets = self._group_tree(name)
+        # 删分组要连子孙一起删（否则下级会变成挂在空父级上的孤儿），
+        # 所以这里要的是「名字集合」，用 _group_scope。
+        targets = self._group_scope(name)
         if targets:
             self.groups = [g for g in self.groups if g["name"] not in targets]
             save_groups(self.groups, self.groups_path)
@@ -323,15 +340,24 @@ class Api:
         save_groups(self.groups, self.groups_path)
         return {"groups": self.get_groups(), "people": self.get_people()}
 
-    def update_group(self, name: str, new_name: str = "", parent: str = "") -> dict:
-        """重命名分组并可选修改上级分组；不允许移动到自己的下级里。"""
+    def update_group(self, name: str, new_name: str = "", parent: str = None) -> dict:
+        """重命名分组并可选修改上级分组；不允许移动到自己的下级里。
+
+        parent 传 None 表示「只改名，上级保持不动」；传空串才是明确的「挪到顶级」。
+        默认给空串的话，凡是只改名的调用都会顺手把上级清掉。
+        """
         name = (name or "").strip()
         if not name or not self._has_group(name):
             return {"groups": self.get_groups(), "people": self.get_people()}
 
         new_name = (new_name or "").strip() or name
+        if parent is None:
+            parent = next(
+                (g.get("parent") or "" for g in self.groups if g["name"] == name), ""
+            )
         parent = (parent or "").strip()
-        tree = self._group_tree(name)
+        # 不能把分组挪到自己的下级里去，否则整棵树成环、下拉里就找不到了
+        tree = self._group_scope(name)
 
         if new_name != name and self._has_group(new_name):
             return {"groups": self.get_groups(), "people": self.get_people()}
@@ -356,18 +382,6 @@ class Api:
 
     def _has_group(self, name: str) -> bool:
         return any(group["name"] == name for group in self.groups)
-
-    def _group_tree(self, root: str) -> set:
-        """返回 root 及其所有下级分组的名字集合。"""
-        targets = {root}
-        changed = True
-        while changed:
-            changed = False
-            for group in self.groups:
-                if group["parent"] in targets and group["name"] not in targets:
-                    targets.add(group["name"])
-                    changed = True
-        return targets
 
     def import_schedules(self, group: str = "") -> dict:
         """选择文件后立即导入（同步版，供测试与兼容使用）。"""
@@ -967,11 +981,16 @@ class Api:
         except Exception:  # noqa: BLE001
             pass
 
-    def _ask_save_path(self, week: int) -> str:
-        """让用户选保存位置；取消返回空串。
+    def _ask_duty_save_path(self, week: int) -> str:
+        """让用户选值班表保存位置；取消返回空串。
 
         首选 pywebview 自带的对话框：它走 Qt 主线程、和界面是同一个 GUI 栈。
         tkinter 是从 js_api 的子线程里弹的，打包后不一定可靠，只作兜底。
+
+        ⚠️ 方法名不能叫 `_ask_save_path`：类体里后面那个给数据包用的同名
+        staticmethod 会把它顶掉（Python 类体是顺序执行、后者覆盖前者），
+        结果 `self._ask_save_path(week)` 少传一个参数直接 TypeError，
+        被上层 try 吞掉后表现为「保存对话框打不开」。
         """
         filename = f"第{week}周值班表.docx"
 
@@ -984,6 +1003,7 @@ class Api:
                 dialog_type = dialog.SAVE if dialog is not None else webview.SAVE_DIALOG
                 result = window.create_file_dialog(
                     dialog_type,
+                    directory=_default_save_dir(),
                     save_filename=filename,
                     file_types=("Word 文档 (*.docx)",),
                 )
@@ -1042,17 +1062,19 @@ class Api:
             return {"ok": False, "error": f"第 {week} 周还没有排班"}
 
         names = {}
+        groups = {}
         for person in people:
             key = duty_person_key(person)
             if key:
                 names[key] = person.get("name") or key
+                groups[key] = person.get("group") or ""
 
         fallback_note = ""
         target = out_path
 
         if not target:
             try:
-                target = self._ask_save_path(week)
+                target = self._ask_duty_save_path(week)
             except Exception as exc:  # noqa: BLE001
                 self._log_export_error(f"保存对话框打不开：{exc!r}\n{traceback.format_exc()}")
                 fallback_note = "保存对话框打不开，已导出到程序目录下的 data\\exports"
@@ -1063,9 +1085,11 @@ class Api:
 
         if not target:
             target = os.path.join(self.exports_dir, f"第{week}周值班表.docx")
+        else:
+            target = _ensure_extension(target, ".docx")
 
         try:
-            saved = export_roster(roster, names, target)
+            saved = export_roster(roster, names, target, groups=groups)
         except FileNotFoundError as exc:
             return {"ok": False, "error": str(exc)}
         except Exception as exc:  # noqa: BLE001
@@ -1074,7 +1098,7 @@ class Api:
                 self._log_export_error(f"写入失败：{target}\n{exc!r}\n{traceback.format_exc()}")
                 try:
                     fallback = os.path.join(self.exports_dir, f"第{week}周值班表.docx")
-                    saved = export_roster(roster, names, fallback)
+                    saved = export_roster(roster, names, fallback, groups=groups)
                     return {
                         "ok": True,
                         "path": saved,
@@ -1152,7 +1176,8 @@ class Api:
             root.destroy()
 
     @staticmethod
-    def _ask_save_path(default_name: str, filetypes: list) -> str:
+    def _ask_pack_save_path(default_name: str, filetypes: list) -> str:
+        """选数据包的保存位置（和值班表那个对话框分开命名，别重名）。"""
         root = tk.Tk()
         root.withdraw()
         root.attributes("-topmost", True)
@@ -1169,7 +1194,7 @@ class Api:
             root.destroy()
 
     @staticmethod
-    def _ask_open_path(filetypes: list) -> str:
+    def _ask_pack_open_path(filetypes: list) -> str:
         root = tk.Tk()
         root.withdraw()
         root.attributes("-topmost", True)
@@ -1248,7 +1273,7 @@ class Api:
         if not people:
             return {"ok": False, "error": "还没有导入任何课表，没有可导出的内容"}
 
-        path = self._ask_save_path(share_pack.default_filename(), self._PACK_FILETYPES)
+        path = self._ask_pack_save_path(share_pack.default_filename(), self._PACK_FILETYPES)
         if not path:
             return {"ok": False, "cancelled": True}
 
@@ -1272,7 +1297,7 @@ class Api:
 
     def import_share_pack(self) -> dict:
         """选择数据包并解析，**先不落盘**。前端拿到摘要后再调 confirm。"""
-        path = self._ask_open_path(self._PACK_FILETYPES)
+        path = self._ask_pack_open_path(self._PACK_FILETYPES)
         if not path:
             return {"ok": False, "cancelled": True}
 

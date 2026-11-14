@@ -1,6 +1,6 @@
 """课表 PDF 自动入库链路的测试。
 
-用 空课表/tests/fixtures/ 下的真实课表样本（网格版式与列表版式各若干）验证
+用 tests/fixtures/ 下的真实课表样本（网格版式与列表版式各若干）验证
 「PDF → 解析 → 合并进人员列表」这条合并后的核心链路。
 不涉及 Qt 与网络。
 """
@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.api import Api  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FIXTURES = os.path.join(ROOT, "空课表", "tests", "fixtures")
+FIXTURES = os.path.join(ROOT, "tests", "fixtures")
 
 GRID = os.path.join(FIXTURES, "sample_grid.pdf")
 LIST = os.path.join(FIXTURES, "sample_list.pdf")
